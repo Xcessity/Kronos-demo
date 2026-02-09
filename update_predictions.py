@@ -46,7 +46,7 @@ def make_prediction(df, predictor):
     new_timestamps_index = pd.date_range(
         start=start_new_range,
         periods=Config["PRED_HORIZON"],
-        freq='H'
+        freq='h'
     )
     y_timestamp = pd.Series(new_timestamps_index, name='y_timestamp')
     x_timestamp = df['timestamps']
@@ -269,6 +269,8 @@ def run_scheduler(model):
 
         try:
             main_task(model)
+            break # Exit after one successful run (remove this line to keep running indefinitely)
+
         except Exception as e:
             print(f"\n!!!!!! A critical error occurred in the main task !!!!!!!")
             print(f"Error: {e}")
