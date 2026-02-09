@@ -243,14 +243,14 @@ def main_task(model):
     commit_message = f"Auto-update forecast for {datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC"
     git_commit_and_push(commit_message)
 
-    # --- 新增的内存清理步骤 ---
-    # 显式删除大的DataFrame对象，帮助垃圾回收器
+    # --- Added memory cleanup step ---
+    # Explicitly delete large DataFrame objects to help the garbage collector
     del df_full, df_for_model, close_preds, volume_preds, v_close_preds
     del hist_df_for_plot, hist_df_for_metrics
 
-    # 强制执行垃圾回收
+    # Force garbage collection
     gc.collect()
-    # --- 内存清理结束 ---
+    # --- End of memory cleanup ---
 
     print("-" * 60 + "\n--- Task completed successfully ---\n" + "-" * 60 + "\n")
 
