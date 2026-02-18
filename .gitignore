@@ -1,3 +1,4 @@
 venv/
 .claude/
 model/__pycache__/
+prediction_chart.png
