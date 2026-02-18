@@ -34,7 +34,9 @@ def load_model():
     model = Kronos.from_pretrained("NeoQuasar/Kronos-mini", cache_dir=Config["MODEL_PATH"])
     tokenizer.eval()
     model.eval()
-    predictor = KronosPredictor(model, tokenizer, device="cpu", max_context=512)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Using device: {device}")
+    predictor = KronosPredictor(model, tokenizer, device=device, max_context=512)
     print("Model loaded successfully.")
     return predictor
 
@@ -205,26 +207,6 @@ def update_html(upside_prob, vol_amp_prob):
         f.write(content)
     print("HTML file updated successfully.")
 
-
-def git_commit_and_push(commit_message):
-    """Adds, commits, and pushes specified files to the Git repository."""
-    print("Performing Git operations...")
-    try:
-        os.chdir(Config["REPO_PATH"])
-        subprocess.run(['git', 'add', 'prediction_chart.png', 'index.html'], check=True, capture_output=True, text=True)
-        commit_result = subprocess.run(['git', 'commit', '-m', commit_message], check=True, capture_output=True, text=True)
-        print(commit_result.stdout)
-        push_result = subprocess.run(['git', 'push'], check=True, capture_output=True, text=True)
-        print(push_result.stdout)
-        print("Git push successful.")
-    except subprocess.CalledProcessError as e:
-        output = e.stdout if e.stdout else e.stderr
-        if "nothing to commit" in output or "Your branch is up to date" in output:
-            print("No new changes to commit or push.")
-        else:
-            print(f"A Git error occurred:\n--- STDOUT ---\n{e.stdout}\n--- STDERR ---\n{e.stderr}")
-
-
 def main_task(model):
     """Executes one full update cycle."""
     print("\n" + "=" * 60 + f"\nStarting update task at {datetime.now(timezone.utc)}\n" + "=" * 60)
@@ -239,9 +221,6 @@ def main_task(model):
     upside_prob, vol_amp_prob = calculate_metrics(hist_df_for_metrics, close_preds, v_close_preds)
     create_plot(hist_df_for_plot, close_preds, volume_preds)
     update_html(upside_prob, vol_amp_prob)
-
-    commit_message = f"Auto-update forecast for {datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC"
-    git_commit_and_push(commit_message)
 
     # --- Added memory cleanup step ---
     # Explicitly delete large DataFrame objects to help the garbage collector
@@ -269,7 +248,6 @@ def run_scheduler(model):
 
         try:
             main_task(model)
-            break # Exit after one successful run (remove this line to keep running indefinitely)
 
         except Exception as e:
             print(f"\n!!!!!! A critical error occurred in the main task !!!!!!!")
@@ -287,4 +265,4 @@ if __name__ == '__main__':
 
     loaded_model = load_model()
     main_task(loaded_model)  # Run once on startup
-    run_scheduler(loaded_model)  # Start the schedule
+    # run_scheduler(loaded_model)  # Start the schedule

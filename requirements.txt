@@ -1,7 +1,7 @@
 numpy==2.4.2
 pandas==3.0.0
 matplotlib==3.10.8
-torch==2.10.0
+torch==2.10.0+cu128
 python-binance==1.0.34
 huggingface_hub==1.4.1
 tqdm==4.67.3

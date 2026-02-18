@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug update_predictions",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/update_predictions.py",
+            "python": "${workspaceFolder}/venv/Scripts/python.exe",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}
