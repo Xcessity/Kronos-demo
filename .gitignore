@@ -2,3 +2,5 @@ venv/
 .claude/
 model/__pycache__/
 prediction_chart.png
+historic_candles.csv
+evaluation_results.csv
