@@ -77,12 +77,16 @@ def calculate_metrics(df):
         avg_pnl = pnl.mean()
         num_trades = len(subset)
 
+        # --- Return / Drawdown Ratio ---
+        return_dd_ratio = total_pnl / abs(max_drawdown) if max_drawdown != 0 else np.inf
+
         rows.append({
             "horizon": h,
             "num_trades": num_trades,
             "win_rate": round(win_rate, 4),
             "profit_factor": round(profit_factor, 4) if profit_factor != np.inf else np.inf,
             "max_drawdown": round(max_drawdown, 2),
+            "return_dd_ratio": round(return_dd_ratio, 4) if np.isfinite(return_dd_ratio) else np.inf,
             "total_pnl": round(total_pnl, 2),
             "avg_pnl": round(avg_pnl, 2),
             "gross_profit": round(gross_profit, 2),
@@ -90,7 +94,7 @@ def calculate_metrics(df):
         })
 
         print(f"h{h:>2}: trades={num_trades}  win_rate={win_rate:.2%}  "
-              f"PF={profit_factor:.2f}  max_dd={max_drawdown:.2f}  total_pnl={total_pnl:.2f}")
+              f"PF={profit_factor:.2f}  max_dd={max_drawdown:.2f}  R/DD={return_dd_ratio:.2f}  total_pnl={total_pnl:.2f}")
 
     metrics_df = pd.DataFrame(rows)
     return metrics_df
@@ -135,6 +139,7 @@ def optimize_thresholds(df):
         best_trades = 0
         best_win_rate = 0.0
         best_pf = 0.0
+        best_rdd = 0.0
 
         for change_thresh, std_thresh in product(change_values, std_values):
             mask = expected_change >= change_thresh
@@ -158,12 +163,16 @@ def optimize_thresholds(df):
                 gp = pnl[pnl > 0].sum()
                 gl = abs(pnl[pnl < 0].sum())
                 best_pf = gp / gl if gl > 0 else (np.inf if gp > 0 else 0.0)
+                cum_pnl = np.cumsum(pnl)
+                max_dd = (cum_pnl - np.maximum.accumulate(cum_pnl)).min()
+                best_rdd = total_pnl / abs(max_dd) if max_dd != 0 else np.inf
 
         rows.append({
             "horizon": h,
             "best_min_change": round(best_change_thresh, 2),
             "best_max_std": round(best_std_thresh, 2) if np.isfinite(best_std_thresh) else "none",
             "best_total_pnl": round(best_total_pnl, 2),
+            "best_return_dd_ratio": round(best_rdd, 4) if np.isfinite(best_rdd) else np.inf,
             "best_profit_factor": round(best_pf, 4) if np.isfinite(best_pf) else np.inf,
             "best_win_rate": round(best_win_rate, 4),
             "num_trades": best_trades,
@@ -171,7 +180,7 @@ def optimize_thresholds(df):
 
         std_display = f"{best_std_thresh:.0f}" if np.isfinite(best_std_thresh) else "none"
         print(f"h{h:>2}: min_change={best_change_thresh:>7.1f}  max_std={std_display:>6s}  "
-              f"total_pnl={best_total_pnl:>10.2f}  PF={best_pf:.2f}  win_rate={best_win_rate:.2%}  trades={best_trades}")
+              f"total_pnl={best_total_pnl:>10.2f}  R/DD={best_rdd:.2f}  PF={best_pf:.2f}  win_rate={best_win_rate:.2%}  trades={best_trades}")
 
     opt_df = pd.DataFrame(rows)
     return opt_df
