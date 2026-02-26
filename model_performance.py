@@ -14,6 +14,7 @@ RESULTS_DIR = REPO_PATH / "results"
 INITIAL_BALANCE = 1000.0
 HORIZONS = list(range(1, 25))
 MIN_CHANGE_RANGE = np.arange(0.0, 2.05, 0.05)
+MAX_STD_RANGE = np.arange(0.0, 2.05, 0.05)
 
 
 def load_data():
@@ -22,16 +23,22 @@ def load_data():
     return df
 
 
-def compute_trades(df, horizon, min_change_pct=0.0):
+def compute_trades(df, horizon, min_change_pct=0.0, max_std_pct=None):
     col_pred = f"close_mean_h{horizon}"
+    col_std = f"close_std_h{horizon}"
     col_actual = f"actual_close_h{horizon}"
     col_entry = "actual_close"
 
-    sub = df[[col_entry, col_pred, col_actual]].dropna().copy()
-    sub.columns = ["entry", "predicted", "actual"]
+    sub = df[[col_entry, col_pred, col_std, col_actual]].dropna().copy()
+    sub.columns = ["entry", "predicted", "std", "actual"]
 
     predicted_change_pct = (sub["predicted"] - sub["entry"]) / sub["entry"] * 100.0
     mask = predicted_change_pct.abs() >= min_change_pct
+
+    if max_std_pct is not None and max_std_pct > 0:
+        std_pct = sub["std"] / sub["entry"] * 100.0
+        mask = mask & (std_pct <= max_std_pct)
+
     sub = sub[mask].copy()
 
     if len(sub) == 0:
@@ -110,26 +117,31 @@ def baseline_metrics(df):
 
 
 def optimize_thresholds(df):
-    print("\n=== Optimizing min_change threshold ===")
+    print("\n=== Optimizing min_change + max_std thresholds ===")
     best_rows = []
     for h in HORIZONS:
-        best_ret_dd = -float("inf")
-        best_threshold = 0.0
+        best_pnl = -float("inf")
+        best_mc = 0.0
+        best_std = 0.0
         best_metrics = None
 
         for mc in MIN_CHANGE_RANGE:
             mc = round(mc, 2)
-            trades = compute_trades(df, h, min_change_pct=mc)
-            m = compute_metrics(trades)
-            if m["return_dd_ratio"] > best_ret_dd:
-                best_ret_dd = m["return_dd_ratio"]
-                best_threshold = mc
-                best_metrics = m
+            for ms in MAX_STD_RANGE:
+                ms = round(ms, 2)
+                trades = compute_trades(df, h, min_change_pct=mc, max_std_pct=ms if ms > 0 else None)
+                m = compute_metrics(trades)
+                if m["total_pnl"] > best_pnl:
+                    best_pnl = m["total_pnl"]
+                    best_mc = mc
+                    best_std = ms
+                    best_metrics = m
 
         best_metrics["horizon"] = h
-        best_metrics["best_min_change_pct"] = best_threshold
+        best_metrics["best_min_change_pct"] = best_mc
+        best_metrics["best_max_std_pct"] = best_std
         best_rows.append(best_metrics)
-        print(f"  h{h:>2}: best_threshold={best_threshold:.2f}%  "
+        print(f"  h{h:>2}: min_change={best_mc:.2f}%  max_std={best_std:.2f}%  "
               f"trades={best_metrics['num_trades']:>5}  pnl=${best_metrics['total_pnl']:>9.2f}  "
               f"win_rate={best_metrics['win_rate']:.4f}  pf={best_metrics['profit_factor']:>7.4f}  "
               f"sharpe={best_metrics['sharpe_ratio']:>7.4f}  "
@@ -145,7 +157,8 @@ def plot_equity_charts(df, optimized_df):
     for _, row in optimized_df.iterrows():
         h = int(row["horizon"])
         mc = row["best_min_change_pct"]
-        trades = compute_trades(df, h, min_change_pct=mc)
+        ms = row["best_max_std_pct"]
+        trades = compute_trades(df, h, min_change_pct=mc, max_std_pct=ms if ms > 0 else None)
         if len(trades) == 0:
             continue
 
@@ -158,7 +171,7 @@ def plot_equity_charts(df, optimized_df):
                         where=equity >= INITIAL_BALANCE, alpha=0.15, color="#4CAF50")
         ax.fill_between(range(len(equity)), INITIAL_BALANCE, equity,
                         where=equity < INITIAL_BALANCE, alpha=0.15, color="#F44336")
-        ax.set_title(f"Equity Curve  h{h}  |  min_change={mc:.2f}%  |  "
+        ax.set_title(f"Equity Curve  h{h}  |  min_change={mc:.2f}%  |  max_std={ms:.2f}%  |  "
                      f"PnL=${row['total_pnl']:.2f}  |  Sharpe={row['sharpe_ratio']:.2f}  |  "
                      f"Trades={int(row['num_trades'])}", fontsize=11)
         ax.set_xlabel("Trade #")
@@ -185,9 +198,9 @@ if __name__ == "__main__":
 
     optimized_df = optimize_thresholds(df)
     opt_path = REPO_PATH / "performance_optimized.csv"
-    opt_order = ["horizon", "best_min_change_pct", "num_trades", "win_rate", "profit_factor",
-                 "max_drawdown", "return_dd_ratio", "sharpe_ratio", "final_equity", "total_pnl",
-                 "gross_profit", "gross_loss"]
+    opt_order = ["horizon", "best_min_change_pct", "best_max_std_pct", "num_trades", "win_rate",
+                 "profit_factor", "max_drawdown", "return_dd_ratio", "sharpe_ratio",
+                 "final_equity", "total_pnl", "gross_profit", "gross_loss"]
     optimized_df[opt_order].to_csv(opt_path, index=False)
     print(f"Saved optimized metrics to {opt_path.name}")
 
