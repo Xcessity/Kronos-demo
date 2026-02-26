@@ -113,7 +113,7 @@ def optimize_thresholds(df):
     print("\n=== Optimizing min_change threshold ===")
     best_rows = []
     for h in HORIZONS:
-        best_pnl = -float("inf")
+        best_ret_dd = -float("inf")
         best_threshold = 0.0
         best_metrics = None
 
@@ -121,8 +121,8 @@ def optimize_thresholds(df):
             mc = round(mc, 2)
             trades = compute_trades(df, h, min_change_pct=mc)
             m = compute_metrics(trades)
-            if m["total_pnl"] > best_pnl:
-                best_pnl = m["total_pnl"]
+            if m["return_dd_ratio"] > best_ret_dd:
+                best_ret_dd = m["return_dd_ratio"]
                 best_threshold = mc
                 best_metrics = m
 
@@ -130,7 +130,8 @@ def optimize_thresholds(df):
         best_metrics["best_min_change_pct"] = best_threshold
         best_rows.append(best_metrics)
         print(f"  h{h:>2}: best_threshold={best_threshold:.2f}%  "
-              f"trades={best_metrics['num_trades']:>5}  pnl=${best_pnl:>9.2f}  "
+              f"trades={best_metrics['num_trades']:>5}  pnl=${best_metrics['total_pnl']:>9.2f}  "
+              f"win_rate={best_metrics['win_rate']:.4f}  pf={best_metrics['profit_factor']:>7.4f}  "
               f"sharpe={best_metrics['sharpe_ratio']:>7.4f}  "
               f"ret/dd={best_metrics['return_dd_ratio']:>7.4f}")
 
