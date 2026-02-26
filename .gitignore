@@ -4,3 +4,4 @@ model/__pycache__/
 prediction_chart.png
 *.csv
 results/
+equity_chart.png

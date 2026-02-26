@@ -15,6 +15,8 @@ INITIAL_BALANCE = 1000.0
 HORIZONS = list(range(1, 25))
 MIN_CHANGE_RANGE = np.arange(0.0, 2.05, 0.05)
 MAX_STD_RANGE = np.arange(0.0, 2.05, 0.05)
+MIN_PROFIT_FACTOR = 1.1
+MIN_RETURN_DD_RATIO = 1.5
 
 
 def load_data():
@@ -49,7 +51,7 @@ def compute_trades(df, horizon, min_change_pct=0.0, max_std_pct=None):
     return sub
 
 
-def compute_metrics(trades_df, balance=INITIAL_BALANCE):
+def compute_metrics(trades_df, horizon=1, balance=INITIAL_BALANCE):
     if len(trades_df) == 0:
         return {
             "num_trades": 0, "win_rate": 0.0, "total_pnl": 0.0,
@@ -58,7 +60,8 @@ def compute_metrics(trades_df, balance=INITIAL_BALANCE):
             "max_drawdown": 0.0, "gross_profit": 0.0, "gross_loss": 0.0,
         }
 
-    pnl_dollars = trades_df["pnl_pct"] / 100.0 * balance
+    position_size = balance / horizon
+    pnl_dollars = trades_df["pnl_pct"] / 100.0 * position_size
     equity_curve = balance + pnl_dollars.cumsum()
 
     wins = (pnl_dollars > 0).sum()
@@ -97,8 +100,9 @@ def compute_metrics(trades_df, balance=INITIAL_BALANCE):
     }
 
 
-def build_equity_curve(trades_df, balance=INITIAL_BALANCE):
-    pnl_dollars = trades_df["pnl_pct"] / 100.0 * balance
+def build_equity_curve(trades_df, horizon=1, balance=INITIAL_BALANCE):
+    position_size = balance / horizon
+    pnl_dollars = trades_df["pnl_pct"] / 100.0 * position_size
     return balance + pnl_dollars.cumsum().values
 
 
@@ -107,7 +111,7 @@ def baseline_metrics(df):
     rows = []
     for h in HORIZONS:
         trades = compute_trades(df, h, min_change_pct=0.0)
-        m = compute_metrics(trades)
+        m = compute_metrics(trades, horizon=h)
         m["horizon"] = h
         rows.append(m)
         print(f"  h{h:>2}: trades={m['num_trades']:>5}  win_rate={m['win_rate']:.4f}  "
@@ -130,13 +134,16 @@ def optimize_thresholds(df):
             for ms in MAX_STD_RANGE:
                 ms = round(ms, 2)
                 trades = compute_trades(df, h, min_change_pct=mc, max_std_pct=ms if ms > 0 else None)
-                m = compute_metrics(trades)
-                if m["total_pnl"] > best_pnl:
+                m = compute_metrics(trades, horizon=h)
+                if m["profit_factor"] >= MIN_PROFIT_FACTOR and m["return_dd_ratio"] >= MIN_RETURN_DD_RATIO and m["total_pnl"] > best_pnl:
                     best_pnl = m["total_pnl"]
                     best_mc = mc
                     best_std = ms
                     best_metrics = m
 
+        if best_metrics is None:
+            print(f"  h{h:>2}: no combination with profit_factor >= {MIN_PROFIT_FACTOR} and return_dd_ratio >= {MIN_RETURN_DD_RATIO}")
+            continue
         best_metrics["horizon"] = h
         best_metrics["best_min_change_pct"] = best_mc
         best_metrics["best_max_std_pct"] = best_std
@@ -162,7 +169,7 @@ def plot_equity_charts(df, optimized_df):
         if len(trades) == 0:
             continue
 
-        equity = build_equity_curve(trades)
+        equity = build_equity_curve(trades, horizon=h)
 
         fig, ax = plt.subplots(figsize=(12, 5))
         ax.plot(equity, linewidth=1.0, color="#2196F3")
