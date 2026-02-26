@@ -7,9 +7,9 @@ from pathlib import Path
 
 # --- Configuration ---
 STARTING_CAPITAL = 1000.0       # USD
-PRED_HORIZON = 3                # which horizon to trade on (1-24)
-MIN_CHANGE_PCT = 0.2           # minimum predicted change in % to open a trade
-MAX_STD_PCT = 10.35              # maximum prediction std in % to allow a trade
+PRED_HORIZON = 1                # which horizon to trade on (1-24)
+MIN_CHANGE_PCT = 0.4           # minimum predicted change in % to open a trade
+MAX_STD_PCT = 0.6              # maximum prediction std in % to allow a trade
 
 RESULTS_CSV = Path(__file__).parent / "evaluation_results.csv"
 EQUITY_CHART = Path(__file__).parent / "equity_chart.png"
@@ -120,24 +120,87 @@ def compute_metrics(trades):
     return metrics, equity
 
 
-def plot_equity(equity, trades):
-    timestamps = [trades[0]["timestamp"]] if trades else []
-    for t in trades:
-        timestamps.append(t["timestamp"])
+def compute_metrics_compounding(trades):
+    if not trades:
+        return None, []
 
-    fig, ax = plt.subplots(figsize=(14, 5))
-    ax.plot(range(len(equity)), equity, color="#2196F3", linewidth=1.2)
-    ax.axhline(STARTING_CAPITAL, color="gray", linestyle="--", linewidth=0.8, alpha=0.6)
-    ax.fill_between(range(len(equity)), STARTING_CAPITAL, equity,
-                    where=equity >= STARTING_CAPITAL, alpha=0.15, color="green")
-    ax.fill_between(range(len(equity)), STARTING_CAPITAL, equity,
-                    where=equity < STARTING_CAPITAL, alpha=0.15, color="red")
-    ax.set_title(f"Equity Curve — Horizon h{PRED_HORIZON} | "
-                 f"min_change={MIN_CHANGE_PCT}% | max_std={MAX_STD_PCT}%",
-                 fontsize=12, fontweight="bold")
-    ax.set_xlabel("Trade #")
-    ax.set_ylabel("Equity (USD)")
-    ax.grid(True, alpha=0.3)
+    pnl_pcts = np.array([t["pnl_pct"] for t in trades])
+    num_trades = len(pnl_pcts)
+    wins = np.sum(pnl_pcts > 0)
+    win_rate = wins / num_trades * 100
+
+    # compounding: each trade uses current equity / horizon
+    equity = [STARTING_CAPITAL]
+    for pnl in pnl_pcts:
+        position_size = equity[-1] / PRED_HORIZON
+        equity.append(equity[-1] + position_size * pnl / 100.0)
+    equity = np.array(equity)
+
+    # max drawdown
+    running_max = np.maximum.accumulate(equity)
+    drawdown = equity - running_max
+    max_dd = drawdown.min()
+
+    # total pnl
+    total_pnl = equity[-1] - STARTING_CAPITAL
+
+    # return to drawdown ratio
+    ret_dd_ratio = total_pnl / abs(max_dd) if max_dd != 0 else 0.0
+
+    # sharpe ratio (on per-trade dollar pnl)
+    pnl_dollars = np.diff(equity)
+    if num_trades > 1 and pnl_dollars.std() > 0:
+        sharpe = pnl_dollars.mean() / pnl_dollars.std() * np.sqrt(num_trades)
+    else:
+        sharpe = 0.0
+
+    # profit factor
+    gross_profit = pnl_dollars[pnl_dollars > 0].sum()
+    gross_loss = abs(pnl_dollars[pnl_dollars < 0].sum())
+    profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
+
+    metrics = {
+        "Num Trades": num_trades,
+        "Win Rate": f"{win_rate:.2f}%",
+        "Total PnL": f"${total_pnl:.2f}",
+        "Final Equity": f"${equity[-1]:.2f}",
+        "Max Drawdown": f"${max_dd:.2f}",
+        "Return/DD Ratio": f"{ret_dd_ratio:.2f}",
+        "Sharpe Ratio": f"{sharpe:.2f}",
+        "Profit Factor": f"{profit_factor:.2f}",
+    }
+
+    return metrics, equity
+
+
+def plot_equity(equity, equity_comp, trades):
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 5))
+    subtitle = f"Horizon h{PRED_HORIZON} | min_change={MIN_CHANGE_PCT}% | max_std={MAX_STD_PCT}%"
+
+    # fixed position
+    ax1.plot(range(len(equity)), equity, color="#2196F3", linewidth=1.2)
+    ax1.axhline(STARTING_CAPITAL, color="gray", linestyle="--", linewidth=0.8, alpha=0.6)
+    ax1.fill_between(range(len(equity)), STARTING_CAPITAL, equity,
+                     where=equity >= STARTING_CAPITAL, alpha=0.15, color="green")
+    ax1.fill_between(range(len(equity)), STARTING_CAPITAL, equity,
+                     where=equity < STARTING_CAPITAL, alpha=0.15, color="red")
+    ax1.set_title(f"Fixed Position — {subtitle}", fontsize=11, fontweight="bold")
+    ax1.set_xlabel("Trade #")
+    ax1.set_ylabel("Equity (USD)")
+    ax1.grid(True, alpha=0.3)
+
+    # compounding
+    ax2.plot(range(len(equity_comp)), equity_comp, color="#FF9800", linewidth=1.2)
+    ax2.axhline(STARTING_CAPITAL, color="gray", linestyle="--", linewidth=0.8, alpha=0.6)
+    ax2.fill_between(range(len(equity_comp)), STARTING_CAPITAL, equity_comp,
+                     where=equity_comp >= STARTING_CAPITAL, alpha=0.15, color="green")
+    ax2.fill_between(range(len(equity_comp)), STARTING_CAPITAL, equity_comp,
+                     where=equity_comp < STARTING_CAPITAL, alpha=0.15, color="red")
+    ax2.set_title(f"Compounding — {subtitle}", fontsize=11, fontweight="bold")
+    ax2.set_xlabel("Trade #")
+    ax2.set_ylabel("Equity (USD)")
+    ax2.grid(True, alpha=0.3)
+
     fig.tight_layout()
     fig.savefig(EQUITY_CHART, dpi=150)
     plt.close(fig)
@@ -158,8 +221,14 @@ if __name__ == "__main__":
         print("No trades matched the filters. Try adjusting MIN_CHANGE_PCT or MAX_STD_PCT.")
     else:
         metrics, equity = compute_metrics(trades)
-        print("\n--- Performance Metrics ---")
+        metrics_comp, equity_comp = compute_metrics_compounding(trades)
+
+        print("\n--- Fixed Position ---")
         for k, v in metrics.items():
             print(f"  {k:20s}: {v}")
 
-        plot_equity(equity, trades)
+        print("\n--- Compounding ---")
+        for k, v in metrics_comp.items():
+            print(f"  {k:20s}: {v}")
+
+        plot_equity(equity, equity_comp, trades)
