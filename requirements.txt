@@ -7,3 +7,5 @@ huggingface_hub==1.4.1
 tqdm==4.67.3
 einops==0.8.2
 safetensors==0.7.0
+binance-futures-connector
+dotenv
