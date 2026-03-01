@@ -15,6 +15,8 @@ Config = {
     "RETRY_INTERVAL": 10,  # seconds between retries for new candle
     "PRED_HORIZON": 1, # hours ahead to predict (set to 1 for next hour)
     "N_PREDICTIONS": 30,
+    "MIN_PRICE_CHANGE_PCT": 0.40, # minimum predicted price change percentage to consider for trading
+    "MAX_PRICE_STD_PCT": 0.60 # maximum predicted price change std percentage to consider for trading
 }
 
 
@@ -162,6 +164,12 @@ def main(model):
 
             print(f"Actual close: {last_candle_close:.2f} | Prediction for UTC {target_ts} | Predicted close: {close_mean[horizon - 1]:.2f} ± {close_std[horizon - 1]:.2f} ({pred_price_change_pct:.2f}% ± {pred_price_change_std_pct:.2f}%)")
 
+            if(pred_price_change_pct > Config["MIN_PRICE_CHANGE_PCT"] and pred_price_change_std_pct < Config["MAX_PRICE_STD_PCT"]):
+                print(">>> BUY SIGNAL <<<")
+            elif(pred_price_change_pct < -Config["MIN_PRICE_CHANGE_PCT"] and pred_price_change_std_pct < Config["MAX_PRICE_STD_PCT"]):
+                print(">>> SELL SIGNAL <<<")
+            else:
+                print(">>> NO TRADE <<<")
 
 
         except ConnectionError as e:
