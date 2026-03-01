@@ -5,3 +5,4 @@ prediction_chart.png
 *.csv
 results/
 equity_chart.png
+.env
