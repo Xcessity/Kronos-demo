@@ -8,6 +8,8 @@ from model import KronosTokenizer, Kronos, KronosPredictor
 
 # --- Configuration ---
 Config = {
+    "TOKENIZER": "NeoQuasar/Kronos-Tokenizer-2k",
+    "MODEL": "NeoQuasar/Kronos-small",
     "MODEL_PATH": "../Kronos_model",
     "SYMBOL": "BTCUSDT",
     "TIMEFRAME": "1h",
@@ -24,8 +26,8 @@ Config = {
 def load_model():
     """Loads the Kronos model and tokenizer."""
     print("Loading Kronos model...")
-    tokenizer = KronosTokenizer.from_pretrained("NeoQuasar/Kronos-Tokenizer-2k", cache_dir=Config["MODEL_PATH"])
-    model = Kronos.from_pretrained("NeoQuasar/Kronos-mini", cache_dir=Config["MODEL_PATH"])
+    tokenizer = KronosTokenizer.from_pretrained(Config["TOKENIZER"], cache_dir=Config["MODEL_PATH"], local_files_only=True)
+    model = Kronos.from_pretrained(Config["MODEL"], cache_dir=Config["MODEL_PATH"], local_files_only=True)
     tokenizer.eval()
     model.eval()
     device = "cuda" if torch.cuda.is_available() else "cpu"
