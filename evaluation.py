@@ -17,11 +17,11 @@ Config = {
     "TOKENIZER": "NeoQuasar/Kronos-Tokenizer-base",
     "MODEL": "NeoQuasar/Kronos-small",
     "MODEL_PATH": "../Kronos_model",
-    "HIST_POINTS": 512,
+    "HIST_POINTS": 360,
     "PRED_HORIZON": 1, # hours ahead to predict (set to 1 for next hour)
     "N_PREDICTIONS": 50,
     "CANDLE_CSV": "D:/Projects/Cryptobot/Kronos/data/BTCUSDT_1h_20210101_to_20260302_test.csv",
-    "RESULTS_DIR": "experiments/2026-03-02_SMALL_BTCUSDT_1h_2021-01-01",
+    "RESULTS_DIR": "experiments/2026-03-03_SMALL_BTCUSDT_1h_2021-01-01_LB360",
     "RESULTS_CSV": "evaluation_results.csv",
 }
 

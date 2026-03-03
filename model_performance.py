@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 # --- Configuration ---
 REPO_PATH = Path(__file__).parent.resolve()
-EXPERIMENTS_DIR = REPO_PATH / "experiments/2026-03-02_SMALL_BTCUSDT_1h_2021-01-01/"
+EXPERIMENTS_DIR = REPO_PATH / "experiments/2026-03-03_SMALL_BTCUSDT_1h_2021-01-01_LB360/"
 RESULTS_CSV = EXPERIMENTS_DIR / "evaluation_results.csv"
 RESULTS_DIR = EXPERIMENTS_DIR
 INITIAL_BALANCE = 1000.0
