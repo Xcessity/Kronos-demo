@@ -20,15 +20,16 @@ Config = {
     "HIST_POINTS": 512,
     "PRED_HORIZON": 1, # hours ahead to predict (set to 1 for next hour)
     "N_PREDICTIONS": 50,
-    "CANDLE_CSV": "D:\\Projects\\Cryptobot\\Kronos\\data\\BTCUSDT_1h_20210101_to_20260302_test.csv",
+    "CANDLE_CSV": "D:/Projects/Cryptobot/Kronos/data/BTCUSDT_1h_20210101_to_20260302_test.csv",
+    "RESULTS_DIR": "experiments/2026-03-02_SMALL_BTCUSDT_1h_2021-01-01",
     "RESULTS_CSV": "evaluation_results.csv",
 }
 
 
 def load_model():
     print("Loading Kronos model...")
-    tokenizer = KronosTokenizer.from_pretrained(Config["TOKENIZER"], cache_dir=Config["MODEL_PATH"])
-    model = Kronos.from_pretrained(Config["MODEL"], cache_dir=Config["MODEL_PATH"])
+    tokenizer = KronosTokenizer.from_pretrained(Config["TOKENIZER"], cache_dir=Config["MODEL_PATH"], local_files_only=True)
+    model = Kronos.from_pretrained(Config["MODEL"], cache_dir=Config["MODEL_PATH"], local_files_only=True)
     tokenizer.eval()
     model.eval()
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -39,7 +40,7 @@ def load_model():
 
 
 def load_candles():
-    csv_path = Config["CANDLE_CSV"]
+    csv_path = Path(Config["CANDLE_CSV"])
     if csv_path.exists():
         df = pd.read_csv(csv_path, parse_dates=["timestamps"])
         print(f"Loaded {len(df)} cached candles from {csv_path.name}")
@@ -48,9 +49,11 @@ def load_candles():
 
 
 def save_results(df):
-    csv_path = Config["REPO_PATH"] / Config["RESULTS_CSV"]
+    results_dir = Config["REPO_PATH"] / Config["RESULTS_DIR"]
+    results_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = results_dir / Config["RESULTS_CSV"]
     df.to_csv(csv_path, index=False)
-    print(f"Saved {len(df)} evaluation results to {csv_path.name}")
+    print(f"Saved {len(df)} evaluation results to {csv_path}")
 
 
 def run_evaluation(candles_df, predictor):

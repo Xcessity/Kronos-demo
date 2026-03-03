@@ -9,10 +9,11 @@ import matplotlib.pyplot as plt
 
 # --- Configuration ---
 REPO_PATH = Path(__file__).parent.resolve()
-RESULTS_CSV = REPO_PATH / "evaluation_results.csv"
-RESULTS_DIR = REPO_PATH / "results"
+EXPERIMENTS_DIR = REPO_PATH / "experiments/2026-03-02_SMALL_BTCUSDT_1h_2021-01-01/"
+RESULTS_CSV = EXPERIMENTS_DIR / "evaluation_results.csv"
+RESULTS_DIR = EXPERIMENTS_DIR
 INITIAL_BALANCE = 1000.0
-HORIZONS = list(range(1, 25))
+HORIZONS = list(range(1, 2))  # evaluate only h1 for now
 MIN_CHANGE_RANGE = np.arange(0.0, 2.05, 0.05)
 MAX_STD_RANGE = np.arange(0.0, 2.05, 0.05)
 MIN_PROFIT_FACTOR = 1.1

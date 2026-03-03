@@ -6,3 +6,4 @@ prediction_chart.png
 results/
 equity_chart.png
 .env
+experiments/

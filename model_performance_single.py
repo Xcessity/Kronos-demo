@@ -8,11 +8,12 @@ from pathlib import Path
 # --- Configuration ---
 STARTING_CAPITAL = 1000.0       # USD
 PRED_HORIZON = 1                # which horizon to trade on (1-24)
-MIN_CHANGE_PCT = 0.4           # minimum predicted change in % to open a trade
-MAX_STD_PCT = 0.6              # maximum prediction std in % to allow a trade
+MIN_CHANGE_PCT = 0.65           # minimum predicted change in % to open a trade
+MAX_STD_PCT = 1.05              # maximum prediction std in % to allow a trade
 
-RESULTS_CSV = Path(__file__).parent / "evaluation_results.csv"
-EQUITY_CHART = Path(__file__).parent / "equity_chart.png"
+REPO_PATH = Path(__file__).parent.resolve()
+RESULTS_CSV = REPO_PATH / "experiments/2026-03-02_SMALL_BTCUSDT_1h_2021-01-01/evaluation_results.csv"
+EQUITY_CHART = REPO_PATH / "equity_chart.png"
 
 
 def load_data():
