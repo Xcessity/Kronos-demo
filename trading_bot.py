@@ -8,7 +8,7 @@ from model import KronosTokenizer, Kronos, KronosPredictor
 
 # --- Configuration ---
 Config = {
-    "TOKENIZER": "NeoQuasar/Kronos-Tokenizer-2k",
+    "TOKENIZER": "NeoQuasar/Kronos-Tokenizer-base",
     "MODEL": "NeoQuasar/Kronos-small",
     "MODEL_PATH": "../Kronos_model",
     "SYMBOL": "BTCUSDT",
