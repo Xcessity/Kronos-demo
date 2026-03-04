@@ -6,25 +6,31 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 # --- Configuration ---
-STARTING_CAPITAL = 1000.0       # USD
-PRED_HORIZON = 1                # which horizon to trade on (1-24)
-MIN_CHANGE_PCT = 0.65           # minimum predicted change in % to open a trade
-MAX_STD_PCT = 1.05              # maximum prediction std in % to allow a trade
+Config = {
+    "EXPERIMENT_NAME": "2026-03-03_BASE_BTCUSDT_1h_2021-01-01_LB512",
+    "PRED_HORIZON": 1,
+    "MIN_CHANGE_PCT": 0.4,
+    "MAX_STD_PCT": 0.5,
 
-REPO_PATH = Path(__file__).parent.resolve()
-RESULTS_CSV = REPO_PATH / "experiments/2026-03-02_SMALL_BTCUSDT_1h_2021-01-01/evaluation_results.csv"
-EQUITY_CHART = REPO_PATH / "equity_chart.png"
+    "REPO_PATH": Path(__file__).parent.resolve(),
+    "EXPERIMENTS_DIR": "experiments",
+    "RESULTS_CSV": "evaluation_results.csv",
+    "EQUITY_CHART": "equity_chart.png",
+    "INITIAL_BALANCE": 1000.0,
+}
 
 
 def load_data():
-    df = pd.read_csv(RESULTS_CSV, parse_dates=["timestamp"])
+    results_dir = Config["REPO_PATH"] / Config["EXPERIMENTS_DIR"] / Config["EXPERIMENT_NAME"]
+    csv_path = results_dir / Config["RESULTS_CSV"]
+    df = pd.read_csv(csv_path, parse_dates=["timestamp"])
     df.sort_values("timestamp", inplace=True)
     df.reset_index(drop=True, inplace=True)
     return df
 
 
 def simulate(df):
-    h = PRED_HORIZON
+    h = Config["PRED_HORIZON"]
     col_mean = f"close_mean_h{h}"
     col_std = f"close_std_h{h}"
     col_actual = f"actual_close_h{h}"
@@ -47,9 +53,9 @@ def simulate(df):
         pred_change_pct = (pred_price - entry_price) / entry_price * 100
         std_pct = pred_std / entry_price * 100
 
-        if std_pct > MAX_STD_PCT:
+        if std_pct > Config["MAX_STD_PCT"]:
             continue
-        if abs(pred_change_pct) < MIN_CHANGE_PCT:
+        if abs(pred_change_pct) < Config["MIN_CHANGE_PCT"]:
             continue
 
         direction = 1 if pred_change_pct > 0 else -1
@@ -79,11 +85,11 @@ def compute_metrics(trades):
     win_rate = wins / num_trades * 100
 
     # fixed position size (no compounding), scaled by horizon
-    position_size = STARTING_CAPITAL / PRED_HORIZON
+    position_size = Config["INITIAL_BALANCE"] / Config["PRED_HORIZON"]
     pnl_dollars = pnl_pcts / 100.0 * position_size
 
     # build equity curve
-    equity = STARTING_CAPITAL + np.concatenate([[0], pnl_dollars.cumsum()])
+    equity = Config["INITIAL_BALANCE"] + np.concatenate([[0], pnl_dollars.cumsum()])
 
     # max drawdown
     running_max = np.maximum.accumulate(equity)
@@ -131,9 +137,9 @@ def compute_metrics_compounding(trades):
     win_rate = wins / num_trades * 100
 
     # compounding: each trade uses current equity / horizon
-    equity = [STARTING_CAPITAL]
+    equity = [Config["INITIAL_BALANCE"]]
     for pnl in pnl_pcts:
-        position_size = equity[-1] / PRED_HORIZON
+        position_size = equity[-1] / Config["PRED_HORIZON"]
         equity.append(equity[-1] + position_size * pnl / 100.0)
     equity = np.array(equity)
 
@@ -143,7 +149,7 @@ def compute_metrics_compounding(trades):
     max_dd = drawdown.min()
 
     # total pnl
-    total_pnl = equity[-1] - STARTING_CAPITAL
+    total_pnl = equity[-1] - Config["INITIAL_BALANCE"]
 
     # return to drawdown ratio
     ret_dd_ratio = total_pnl / abs(max_dd) if max_dd != 0 else 0.0
@@ -176,15 +182,16 @@ def compute_metrics_compounding(trades):
 
 def plot_equity(equity, equity_comp, trades):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 5))
-    subtitle = f"Horizon h{PRED_HORIZON} | min_change={MIN_CHANGE_PCT}% | max_std={MAX_STD_PCT}%"
+    bal = Config["INITIAL_BALANCE"]
+    subtitle = f"Horizon h{Config['PRED_HORIZON']} | min_change={Config['MIN_CHANGE_PCT']}% | max_std={Config['MAX_STD_PCT']}%"
 
     # fixed position
     ax1.plot(range(len(equity)), equity, color="#2196F3", linewidth=1.2)
-    ax1.axhline(STARTING_CAPITAL, color="gray", linestyle="--", linewidth=0.8, alpha=0.6)
-    ax1.fill_between(range(len(equity)), STARTING_CAPITAL, equity,
-                     where=equity >= STARTING_CAPITAL, alpha=0.15, color="green")
-    ax1.fill_between(range(len(equity)), STARTING_CAPITAL, equity,
-                     where=equity < STARTING_CAPITAL, alpha=0.15, color="red")
+    ax1.axhline(bal, color="gray", linestyle="--", linewidth=0.8, alpha=0.6)
+    ax1.fill_between(range(len(equity)), bal, equity,
+                     where=equity >= bal, alpha=0.15, color="green")
+    ax1.fill_between(range(len(equity)), bal, equity,
+                     where=equity < bal, alpha=0.15, color="red")
     ax1.set_title(f"Fixed Position — {subtitle}", fontsize=11, fontweight="bold")
     ax1.set_xlabel("Trade #")
     ax1.set_ylabel("Equity (USD)")
@@ -192,28 +199,30 @@ def plot_equity(equity, equity_comp, trades):
 
     # compounding
     ax2.plot(range(len(equity_comp)), equity_comp, color="#FF9800", linewidth=1.2)
-    ax2.axhline(STARTING_CAPITAL, color="gray", linestyle="--", linewidth=0.8, alpha=0.6)
-    ax2.fill_between(range(len(equity_comp)), STARTING_CAPITAL, equity_comp,
-                     where=equity_comp >= STARTING_CAPITAL, alpha=0.15, color="green")
-    ax2.fill_between(range(len(equity_comp)), STARTING_CAPITAL, equity_comp,
-                     where=equity_comp < STARTING_CAPITAL, alpha=0.15, color="red")
+    ax2.axhline(bal, color="gray", linestyle="--", linewidth=0.8, alpha=0.6)
+    ax2.fill_between(range(len(equity_comp)), bal, equity_comp,
+                     where=equity_comp >= bal, alpha=0.15, color="green")
+    ax2.fill_between(range(len(equity_comp)), bal, equity_comp,
+                     where=equity_comp < bal, alpha=0.15, color="red")
     ax2.set_title(f"Compounding — {subtitle}", fontsize=11, fontweight="bold")
     ax2.set_xlabel("Trade #")
     ax2.set_ylabel("Equity (USD)")
     ax2.grid(True, alpha=0.3)
 
     fig.tight_layout()
-    fig.savefig(EQUITY_CHART, dpi=150)
+    results_dir = Config["REPO_PATH"] / Config["EXPERIMENTS_DIR"] / Config["EXPERIMENT_NAME"]
+    results_dir.mkdir(parents=True, exist_ok=True)
+    chart_path = results_dir / Config["EQUITY_CHART"]
+    fig.savefig(chart_path, dpi=150)
     plt.close(fig)
-    print(f"Equity chart saved to {EQUITY_CHART.name}")
+    print(f"Equity chart saved to {chart_path.name}")
 
 
 if __name__ == "__main__":
-    print(f"Config: capital=${STARTING_CAPITAL}, horizon=h{PRED_HORIZON}, "
-          f"min_change={MIN_CHANGE_PCT}%, max_std={MAX_STD_PCT}%\n")
+    print(f"Config: capital=${Config['INITIAL_BALANCE']}, horizon=h{Config['PRED_HORIZON']}, "
+          f"min_change={Config['MIN_CHANGE_PCT']}%, max_std={Config['MAX_STD_PCT']}%\n")
 
     df = load_data()
-    print(f"Loaded {len(df)} rows from {RESULTS_CSV.name}")
 
     trades = simulate(df)
     print(f"Trades taken: {len(trades)}")
