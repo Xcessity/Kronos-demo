@@ -7,10 +7,10 @@ from pathlib import Path
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-03_BASE_BTCUSDT_1h_2021-01-01_LB512",
-    "PRED_HORIZON": 1,
-    "MIN_CHANGE_PCT": 0.4,
-    "MAX_STD_PCT": 0.5,
+    "EXPERIMENT_NAME": "2026-03-00_SMALL_VANILLA_BTCUSDT_1h",
+    "PRED_HORIZON": 2,
+    "MIN_CHANGE_PCT": 0.3,
+    "MAX_STD_PCT": 0.65,
 
     "REPO_PATH": Path(__file__).parent.resolve(),
     "EXPERIMENTS_DIR": "experiments",
@@ -85,7 +85,7 @@ def compute_metrics(trades):
     win_rate = wins / num_trades * 100
 
     # fixed position size (no compounding), scaled by horizon
-    position_size = Config["INITIAL_BALANCE"] / Config["PRED_HORIZON"]
+    position_size = Config["INITIAL_BALANCE"]
     pnl_dollars = pnl_pcts / 100.0 * position_size
 
     # build equity curve
@@ -139,7 +139,7 @@ def compute_metrics_compounding(trades):
     # compounding: each trade uses current equity / horizon
     equity = [Config["INITIAL_BALANCE"]]
     for pnl in pnl_pcts:
-        position_size = equity[-1] / Config["PRED_HORIZON"]
+        position_size = equity[-1]
         equity.append(equity[-1] + position_size * pnl / 100.0)
     equity = np.array(equity)
 
