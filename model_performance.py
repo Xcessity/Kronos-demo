@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import numpy as np
@@ -8,21 +7,24 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # --- Configuration ---
-REPO_PATH = Path(__file__).parent.resolve()
-EXPERIMENTS_DIR = REPO_PATH / "experiments/2026-03-03_BASE_BTCUSDT_1h_2021-01-01_LB512_FORECAST6/"
-RESULTS_CSV = EXPERIMENTS_DIR / "evaluation_results.csv"
-RESULTS_DIR = EXPERIMENTS_DIR
-INITIAL_BALANCE = 1000.0
-HORIZONS = list(range(1, 7))  # evaluate only h1 for now
-MIN_CHANGE_RANGE = np.arange(0.0, 2.05, 0.05)
-MAX_STD_RANGE = np.arange(0.0, 2.05, 0.05)
-MIN_PROFIT_FACTOR = 1.1
-MIN_RETURN_DD_RATIO = 1.5
+Config = {
+    "REPO_PATH": Path(__file__).parent.resolve(),
+    "EXPERIMENTS_DIR": "experiments/2026-03-03_BASE_BTCUSDT_1h_2021-01-01_LB512_FORECAST6",
+    "RESULTS_CSV": "evaluation_results.csv",
+    "INITIAL_BALANCE": 1000.0,
+    "HORIZONS": list(range(1, 7)),
+    "MIN_CHANGE_RANGE": np.arange(0.0, 2.05, 0.05),
+    "MAX_STD_RANGE": np.arange(0.0, 2.05, 0.05),
+    "MIN_PROFIT_FACTOR": 1.1,
+    "MIN_RETURN_DD_RATIO": 1.5,
+}
 
 
 def load_data():
-    df = pd.read_csv(RESULTS_CSV, parse_dates=["timestamp"])
-    print(f"Loaded {len(df)} rows from {RESULTS_CSV.name}")
+    results_dir = Config["REPO_PATH"] / Config["EXPERIMENTS_DIR"]
+    csv_path = results_dir / Config["RESULTS_CSV"]
+    df = pd.read_csv(csv_path, parse_dates=["timestamp"])
+    print(f"Loaded {len(df)} rows from {csv_path.name}")
     return df
 
 
@@ -52,7 +54,7 @@ def compute_trades(df, horizon, min_change_pct=0.0, max_std_pct=None):
     return sub
 
 
-def compute_metrics(trades_df, balance=INITIAL_BALANCE):
+def compute_metrics(trades_df, balance=Config["INITIAL_BALANCE"]):
     if len(trades_df) == 0:
         return {
             "num_trades": 0, "win_rate": 0.0, "total_pnl": 0.0,
@@ -101,7 +103,7 @@ def compute_metrics(trades_df, balance=INITIAL_BALANCE):
     }
 
 
-def build_equity_curve(trades_df, balance=INITIAL_BALANCE):
+def build_equity_curve(trades_df, balance=Config["INITIAL_BALANCE"]):
     position_size = balance
     pnl_dollars = trades_df["pnl_pct"] / 100.0 * position_size
     return balance + pnl_dollars.cumsum().values
@@ -110,7 +112,7 @@ def build_equity_curve(trades_df, balance=INITIAL_BALANCE):
 def baseline_metrics(df):
     print("\n=== Baseline metrics (no threshold) ===")
     rows = []
-    for h in HORIZONS:
+    for h in Config["HORIZONS"]:
         trades = compute_trades(df, h, min_change_pct=0.0)
         m = compute_metrics(trades)
         m["horizon"] = h
@@ -124,26 +126,26 @@ def baseline_metrics(df):
 def optimize_thresholds(df):
     print("\n=== Optimizing min_change + max_std thresholds ===")
     best_rows = []
-    for h in HORIZONS:
+    for h in Config["HORIZONS"]:
         best_pnl = -float("inf")
         best_mc = 0.0
         best_std = 0.0
         best_metrics = None
 
-        for mc in MIN_CHANGE_RANGE:
+        for mc in Config["MIN_CHANGE_RANGE"]:
             mc = round(mc, 2)
-            for ms in MAX_STD_RANGE:
+            for ms in Config["MAX_STD_RANGE"]:
                 ms = round(ms, 2)
                 trades = compute_trades(df, h, min_change_pct=mc, max_std_pct=ms if ms > 0 else None)
                 m = compute_metrics(trades)
-                if m["profit_factor"] >= MIN_PROFIT_FACTOR and m["return_dd_ratio"] >= MIN_RETURN_DD_RATIO and m["total_pnl"] > best_pnl:
+                if m["profit_factor"] >= Config["MIN_PROFIT_FACTOR"] and m["return_dd_ratio"] >= Config["MIN_RETURN_DD_RATIO"] and m["total_pnl"] > best_pnl:
                     best_pnl = m["total_pnl"]
                     best_mc = mc
                     best_std = ms
                     best_metrics = m
 
         if best_metrics is None:
-            print(f"  h{h:>2}: no combination with profit_factor >= {MIN_PROFIT_FACTOR} and return_dd_ratio >= {MIN_RETURN_DD_RATIO}")
+            print(f"  h{h:>2}: no combination with profit_factor >= {Config['MIN_PROFIT_FACTOR']} and return_dd_ratio >= {Config['MIN_RETURN_DD_RATIO']}")
             continue
         best_metrics["horizon"] = h
         best_metrics["best_min_change_pct"] = best_mc
@@ -160,7 +162,8 @@ def optimize_thresholds(df):
 
 def plot_equity_charts(df, optimized_df):
     print("\n=== Generating equity charts ===")
-    RESULTS_DIR.mkdir(exist_ok=True)
+    results_dir = Config["REPO_PATH"] / Config["EXPERIMENTS_DIR"]
+    results_dir.mkdir(parents=True, exist_ok=True)
 
     for _, row in optimized_df.iterrows():
         h = int(row["horizon"])
@@ -174,11 +177,12 @@ def plot_equity_charts(df, optimized_df):
 
         fig, ax = plt.subplots(figsize=(12, 5))
         ax.plot(equity, linewidth=1.0, color="#2196F3")
-        ax.axhline(y=INITIAL_BALANCE, color="gray", linestyle="--", linewidth=0.7)
-        ax.fill_between(range(len(equity)), INITIAL_BALANCE, equity,
-                        where=equity >= INITIAL_BALANCE, alpha=0.15, color="#4CAF50")
-        ax.fill_between(range(len(equity)), INITIAL_BALANCE, equity,
-                        where=equity < INITIAL_BALANCE, alpha=0.15, color="#F44336")
+        bal = Config["INITIAL_BALANCE"]
+        ax.axhline(y=bal, color="gray", linestyle="--", linewidth=0.7)
+        ax.fill_between(range(len(equity)), bal, equity,
+                        where=equity >= bal, alpha=0.15, color="#4CAF50")
+        ax.fill_between(range(len(equity)), bal, equity,
+                        where=equity < bal, alpha=0.15, color="#F44336")
         ax.set_title(f"Equity Curve  h{h}  |  min_change={mc:.2f}%  |  max_std={ms:.2f}%  |  "
                      f"PnL=${row['total_pnl']:.2f}  |  Sharpe={row['sharpe_ratio']:.2f}  |  "
                      f"Trades={int(row['num_trades'])}", fontsize=11)
@@ -187,7 +191,7 @@ def plot_equity_charts(df, optimized_df):
         ax.grid(True, alpha=0.3)
         fig.tight_layout()
 
-        path = RESULTS_DIR / f"equity_h{h}.png"
+        path = results_dir / f"equity_h{h}.png"
         fig.savefig(path, dpi=150)
         plt.close(fig)
         print(f"  Saved {path.name}")
@@ -197,7 +201,10 @@ if __name__ == "__main__":
     df = load_data()
 
     baseline_df = baseline_metrics(df)
-    baseline_path = REPO_PATH / "performance_baseline.csv"
+    results_dir = Config["REPO_PATH"] / Config["EXPERIMENTS_DIR"]
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    baseline_path = results_dir / "performance_baseline.csv"
     col_order = ["horizon", "num_trades", "win_rate", "profit_factor", "max_drawdown",
                  "return_dd_ratio", "sharpe_ratio", "final_equity", "total_pnl",
                  "gross_profit", "gross_loss"]
@@ -205,7 +212,7 @@ if __name__ == "__main__":
     print(f"\nSaved baseline metrics to {baseline_path.name}")
 
     optimized_df = optimize_thresholds(df)
-    opt_path = REPO_PATH / "performance_optimized.csv"
+    opt_path = results_dir / "performance_optimized.csv"
     opt_order = ["horizon", "best_min_change_pct", "best_max_std_pct", "num_trades", "win_rate",
                  "profit_factor", "max_drawdown", "return_dd_ratio", "sharpe_ratio",
                  "final_equity", "total_pnl", "gross_profit", "gross_loss"]
