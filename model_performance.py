@@ -8,20 +8,22 @@ import matplotlib.pyplot as plt
 
 # --- Configuration ---
 Config = {
-    "REPO_PATH": Path(__file__).parent.resolve(),
-    "EXPERIMENTS_DIR": "experiments/2026-03-03_BASE_BTCUSDT_1h_2021-01-01_LB512_FORECAST6",
-    "RESULTS_CSV": "evaluation_results.csv",
-    "INITIAL_BALANCE": 1000.0,
-    "HORIZONS": list(range(1, 7)),
-    "MIN_CHANGE_RANGE": np.arange(0.0, 2.05, 0.05),
-    "MAX_STD_RANGE": np.arange(0.0, 2.05, 0.05),
+    "EXPERIMENT_NAME": "2026-03-03_BASE_BTCUSDT_1h_2021-01-01_LB512",
+    "HORIZONS": list(range(1, 2)),
     "MIN_PROFIT_FACTOR": 1.1,
     "MIN_RETURN_DD_RATIO": 1.5,
+
+    "REPO_PATH": Path(__file__).parent.resolve(),
+    "EXPERIMENTS_DIR": "experiments",
+    "RESULTS_CSV": "evaluation_results.csv",
+    "INITIAL_BALANCE": 1000.0,
+    "MIN_CHANGE_RANGE": np.arange(0.0, 2.05, 0.05),
+    "MAX_STD_RANGE": np.arange(0.0, 2.05, 0.05),
 }
 
 
 def load_data():
-    results_dir = Config["REPO_PATH"] / Config["EXPERIMENTS_DIR"]
+    results_dir = Config["REPO_PATH"] / Config["EXPERIMENTS_DIR"] / Config["EXPERIMENT_NAME"]
     csv_path = results_dir / Config["RESULTS_CSV"]
     df = pd.read_csv(csv_path, parse_dates=["timestamp"])
     print(f"Loaded {len(df)} rows from {csv_path.name}")
@@ -162,7 +164,7 @@ def optimize_thresholds(df):
 
 def plot_equity_charts(df, optimized_df):
     print("\n=== Generating equity charts ===")
-    results_dir = Config["REPO_PATH"] / Config["EXPERIMENTS_DIR"]
+    results_dir = Config["REPO_PATH"] / Config["EXPERIMENTS_DIR"] / Config["EXPERIMENT_NAME"]
     results_dir.mkdir(parents=True, exist_ok=True)
 
     for _, row in optimized_df.iterrows():
@@ -201,7 +203,7 @@ if __name__ == "__main__":
     df = load_data()
 
     baseline_df = baseline_metrics(df)
-    results_dir = Config["REPO_PATH"] / Config["EXPERIMENTS_DIR"]
+    results_dir = Config["REPO_PATH"] / Config["EXPERIMENTS_DIR"] / Config["EXPERIMENT_NAME"]
     results_dir.mkdir(parents=True, exist_ok=True)
 
     baseline_path = results_dir / "performance_baseline.csv"
