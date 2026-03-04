@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-00_SMALL_VANILLA_BTCUSDT_1h",
+    "EXPERIMENT_NAME": "2026-03-00_SMALL_RETRAIN_BTCUSDT_1h_2019-01-01",
     "HORIZONS": list(range(1, 25)),
     "MIN_PROFIT_FACTOR": 1.1,
     "MIN_RETURN_DD_RATIO": 1.5,
