@@ -9,11 +9,11 @@ import matplotlib.pyplot as plt
 
 # --- Configuration ---
 REPO_PATH = Path(__file__).parent.resolve()
-EXPERIMENTS_DIR = REPO_PATH / "experiments/2026-03-03_SMALL_BTCUSDT_1h_2021-01-01_LB360/"
+EXPERIMENTS_DIR = REPO_PATH / "experiments/2026-03-03_BASE_BTCUSDT_1h_2021-01-01_LB512_FORECAST6/"
 RESULTS_CSV = EXPERIMENTS_DIR / "evaluation_results.csv"
 RESULTS_DIR = EXPERIMENTS_DIR
 INITIAL_BALANCE = 1000.0
-HORIZONS = list(range(1, 2))  # evaluate only h1 for now
+HORIZONS = list(range(1, 7))  # evaluate only h1 for now
 MIN_CHANGE_RANGE = np.arange(0.0, 2.05, 0.05)
 MAX_STD_RANGE = np.arange(0.0, 2.05, 0.05)
 MIN_PROFIT_FACTOR = 1.1
@@ -52,7 +52,7 @@ def compute_trades(df, horizon, min_change_pct=0.0, max_std_pct=None):
     return sub
 
 
-def compute_metrics(trades_df, horizon=1, balance=INITIAL_BALANCE):
+def compute_metrics(trades_df, balance=INITIAL_BALANCE):
     if len(trades_df) == 0:
         return {
             "num_trades": 0, "win_rate": 0.0, "total_pnl": 0.0,
@@ -61,7 +61,7 @@ def compute_metrics(trades_df, horizon=1, balance=INITIAL_BALANCE):
             "max_drawdown": 0.0, "gross_profit": 0.0, "gross_loss": 0.0,
         }
 
-    position_size = balance / horizon
+    position_size = balance
     pnl_dollars = trades_df["pnl_pct"] / 100.0 * position_size
     equity_curve = balance + pnl_dollars.cumsum()
 
@@ -101,8 +101,8 @@ def compute_metrics(trades_df, horizon=1, balance=INITIAL_BALANCE):
     }
 
 
-def build_equity_curve(trades_df, horizon=1, balance=INITIAL_BALANCE):
-    position_size = balance / horizon
+def build_equity_curve(trades_df, balance=INITIAL_BALANCE):
+    position_size = balance
     pnl_dollars = trades_df["pnl_pct"] / 100.0 * position_size
     return balance + pnl_dollars.cumsum().values
 
@@ -112,7 +112,7 @@ def baseline_metrics(df):
     rows = []
     for h in HORIZONS:
         trades = compute_trades(df, h, min_change_pct=0.0)
-        m = compute_metrics(trades, horizon=h)
+        m = compute_metrics(trades)
         m["horizon"] = h
         rows.append(m)
         print(f"  h{h:>2}: trades={m['num_trades']:>5}  win_rate={m['win_rate']:.4f}  "
@@ -135,7 +135,7 @@ def optimize_thresholds(df):
             for ms in MAX_STD_RANGE:
                 ms = round(ms, 2)
                 trades = compute_trades(df, h, min_change_pct=mc, max_std_pct=ms if ms > 0 else None)
-                m = compute_metrics(trades, horizon=h)
+                m = compute_metrics(trades)
                 if m["profit_factor"] >= MIN_PROFIT_FACTOR and m["return_dd_ratio"] >= MIN_RETURN_DD_RATIO and m["total_pnl"] > best_pnl:
                     best_pnl = m["total_pnl"]
                     best_mc = mc
@@ -170,7 +170,7 @@ def plot_equity_charts(df, optimized_df):
         if len(trades) == 0:
             continue
 
-        equity = build_equity_curve(trades, horizon=h)
+        equity = build_equity_curve(trades)
 
         fig, ax = plt.subplots(figsize=(12, 5))
         ax.plot(equity, linewidth=1.0, color="#2196F3")
