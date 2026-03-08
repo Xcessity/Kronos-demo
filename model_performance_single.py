@@ -7,10 +7,10 @@ from pathlib import Path
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-00_SMALL_VANILLA_BTCUSDT_1h",
+    "EXPERIMENT_NAME": "2026-03-08_SMALL_VANILLA_BTCUSDT_1h_LB512_PRED6",
     "PRED_HORIZON": 2,
-    "MIN_CHANGE_PCT": 0.3,
-    "MAX_STD_PCT": 0.65,
+    "MIN_CHANGE_PCT": 0.1,
+    "MAX_STD_PCT": 0.55,
 
     "REPO_PATH": Path(__file__).parent.resolve(),
     "EXPERIMENTS_DIR": "experiments",
@@ -232,6 +232,12 @@ if __name__ == "__main__":
     else:
         metrics, equity = compute_metrics(trades)
         metrics_comp, equity_comp = compute_metrics_compounding(trades)
+
+        print(f"\n{'#':>3}  {'Date & Time':^22}  {'Dir':^5}  {'Entry':>10}  {'Exit':>10}  {'PnL%':>7}")
+        print("-" * 65)
+        for i, t in enumerate(trades, 1):
+            ts = t["timestamp"].strftime("%Y-%m-%d %H:%M")
+            print(f"{i:3d}  {ts:^22}  {t['direction']:^5}  {t['entry_price']:10.2f}  {t['exit_price']:10.2f}  {t['pnl_pct']:+7.2f}%")
 
         print("\n--- Fixed Position ---")
         for k, v in metrics.items():

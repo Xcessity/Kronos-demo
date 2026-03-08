@@ -17,19 +17,20 @@ Config = {
     "TOKENIZER": "NeoQuasar/Kronos-Tokenizer-base",
     "MODEL": "NeoQuasar/Kronos-small",
     "MODEL_PATH": "../Kronos_model",
-    "HIST_POINTS": 360,
-    "PRED_HORIZON": 12, # hours ahead to predict (set to 1 for next hour)
-    "N_PREDICTIONS": 50,
-    "CANDLE_CSV": "D:/Projects/Cryptobot/Kronos/data/BTCUSDT_1h_20210101_to_20260302_test.csv",
-    "RESULTS_DIR": "experiments/2026-03-04_SMALL_VANILLA_BTCUSDT_1h_LB360_HIST12",
+    "HIST_POINTS": 512,
+    "PRED_HORIZON": 6, # hours ahead to predict (set to 1 for next hour)
+    "N_PREDICTIONS": 100,
+    "CANDLE_CSV": "D:/Projects/Cryptobot/Kronos/data/BTCUSDT_1h_20260114_to_20260308.csv",
+    "RESULTS_DIR": "experiments/2026-03-08_SMALL_VANILLA_BTCUSDT_1h_LB512_PRED6",
     "RESULTS_CSV": "evaluation_results.csv",
+    "USE_LOCAL_MODEL_ONLY": False # if True, only load model from local MODEL_PATH (no Hugging Face download)
 }
 
 
 def load_model():
     print("Loading Kronos model...")
-    tokenizer = KronosTokenizer.from_pretrained(Config["TOKENIZER"], cache_dir=Config["MODEL_PATH"], local_files_only=True)
-    model = Kronos.from_pretrained(Config["MODEL"], cache_dir=Config["MODEL_PATH"], local_files_only=True)
+    tokenizer = KronosTokenizer.from_pretrained(Config["TOKENIZER"], cache_dir=Config["MODEL_PATH"], local_files_only=Config["USE_LOCAL_MODEL_ONLY"])
+    model = Kronos.from_pretrained(Config["MODEL"], cache_dir=Config["MODEL_PATH"], local_files_only=Config["USE_LOCAL_MODEL_ONLY"])
     tokenizer.eval()
     model.eval()
     device = "cuda" if torch.cuda.is_available() else "cpu"
