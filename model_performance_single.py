@@ -7,10 +7,10 @@ from pathlib import Path
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-08_SMALL_VANILLA_BTCUSDT_1h_LB512_PRED6",
+    "EXPERIMENT_NAME": "2026-03-08_SMALL_BTCUSDT_1h_2024-01-01_2026-01-14_LB512_PRED6",
     "PRED_HORIZON": 2,
-    "MIN_CHANGE_PCT": 0.1,
-    "MAX_STD_PCT": 0.55,
+    "MIN_CHANGE_PCT": 0.0,
+    "MAX_STD_PCT": 0.75,
 
     "REPO_PATH": Path(__file__).parent.resolve(),
     "EXPERIMENTS_DIR": "experiments",
@@ -33,43 +33,89 @@ def simulate(df):
     h = Config["PRED_HORIZON"]
     col_mean = f"close_mean_h{h}"
     col_std = f"close_std_h{h}"
-    col_actual = f"actual_close_h{h}"
 
-    required = ["actual_close", col_mean, col_std, col_actual]
+    required = ["actual_close", col_mean, col_std]
     for c in required:
         if c not in df.columns:
             raise ValueError(f"Missing column: {c}")
 
-    trades = []
+    prices = df["actual_close"].values
+    timestamps = df["timestamp"].values
+    n = len(df)
+
+    # Step 1: compute signal for each bar
+    signals = []  # None or +1 (LONG) or -1 (SHORT)
     for _, row in df.iterrows():
         entry_price = row["actual_close"]
         pred_price = row[col_mean]
         pred_std = row[col_std]
-        exit_price = row[col_actual]
 
-        if pd.isna(entry_price) or pd.isna(pred_price) or pd.isna(pred_std) or pd.isna(exit_price):
+        if pd.isna(entry_price) or pd.isna(pred_price) or pd.isna(pred_std):
+            signals.append(None)
             continue
 
         pred_change_pct = (pred_price - entry_price) / entry_price * 100
         std_pct = pred_std / entry_price * 100
 
         if std_pct > Config["MAX_STD_PCT"]:
+            signals.append(None)
             continue
         if abs(pred_change_pct) < Config["MIN_CHANGE_PCT"]:
+            signals.append(None)
             continue
 
-        direction = 1 if pred_change_pct > 0 else -1
-        pnl_pct = direction * (exit_price - entry_price) / entry_price * 100
+        signals.append(1 if pred_change_pct > 0 else -1)
 
+    # Step 2: walk through bars managing a single position
+    trades = []
+    position = None  # {direction, entry_idx, entry_price, close_idx}
+
+    def close_position(exit_idx):
+        """Close the current position and record the trade."""
+        exit_price = prices[exit_idx]
+        d = position["direction"]
+        pnl_pct = d * (exit_price - position["entry_price"]) / position["entry_price"] * 100
         trades.append({
-            "timestamp": row["timestamp"],
-            "direction": "LONG" if direction == 1 else "SHORT",
-            "entry_price": entry_price,
+            "timestamp": pd.Timestamp(timestamps[position["entry_idx"]]),
+            "direction": "LONG" if d == 1 else "SHORT",
+            "entry_price": position["entry_price"],
             "exit_price": exit_price,
-            "pred_change_pct": pred_change_pct,
-            "std_pct": std_pct,
             "pnl_pct": pnl_pct,
         })
+
+    for i in range(n):
+        signal = signals[i]
+
+        if position is not None:
+            if signal is not None:
+                if signal == position["direction"]:
+                    # same direction: extend the trade
+                    position["close_idx"] = min(i + h, n - 1)
+                else:
+                    # opposite direction: close current, open new
+                    close_position(i)
+                    position = {
+                        "direction": signal,
+                        "entry_idx": i,
+                        "entry_price": prices[i],
+                        "close_idx": min(i + h, n - 1),
+                    }
+            elif i >= position["close_idx"]:
+                # no signal and horizon reached: close naturally
+                close_position(position["close_idx"])
+                position = None
+        else:
+            if signal is not None:
+                position = {
+                    "direction": signal,
+                    "entry_idx": i,
+                    "entry_price": prices[i],
+                    "close_idx": min(i + h, n - 1),
+                }
+
+    # close any remaining open position
+    if position is not None:
+        close_position(min(position["close_idx"], n - 1))
 
     return trades
 

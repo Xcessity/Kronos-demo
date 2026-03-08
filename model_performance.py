@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-08_SMALL_VANILLA_BTCUSDT_1h_LB512_PRED6",
+    "EXPERIMENT_NAME": "2026-03-08_SMALL_BTCUSDT_1h_2024-01-01_2026-01-14_LB512_PRED6",
     "HORIZONS": list(range(1, 7)),
     "MIN_PROFIT_FACTOR": 1.1,
     "MIN_RETURN_DD_RATIO": 1.5,
@@ -33,27 +33,88 @@ def load_data():
 def compute_trades(df, horizon, min_change_pct=0.0, max_std_pct=None):
     col_pred = f"close_mean_h{horizon}"
     col_std = f"close_std_h{horizon}"
-    col_actual = f"actual_close_h{horizon}"
     col_entry = "actual_close"
 
-    sub = df[[col_entry, col_pred, col_std, col_actual]].dropna().copy()
-    sub.columns = ["entry", "predicted", "std", "actual"]
+    prices = df[col_entry].values
+    n = len(df)
+    h = horizon
 
-    predicted_change_pct = (sub["predicted"] - sub["entry"]) / sub["entry"] * 100.0
-    mask = predicted_change_pct.abs() >= min_change_pct
+    # Step 1: compute signal for each bar
+    signals = []  # None or +1 (LONG) or -1 (SHORT)
+    for _, row in df.iterrows():
+        entry_price = row[col_entry]
+        pred_price = row[col_pred]
+        pred_std = row[col_std]
 
-    if max_std_pct is not None and max_std_pct > 0:
-        std_pct = sub["std"] / sub["entry"] * 100.0
-        mask = mask & (std_pct <= max_std_pct)
+        if pd.isna(entry_price) or pd.isna(pred_price) or pd.isna(pred_std):
+            signals.append(None)
+            continue
 
-    sub = sub[mask].copy()
+        pred_change_pct = (pred_price - entry_price) / entry_price * 100.0
+        std_pct = pred_std / entry_price * 100.0
 
-    if len(sub) == 0:
-        return pd.DataFrame(columns=["entry", "predicted", "actual", "direction", "pnl_pct"])
+        if abs(pred_change_pct) < min_change_pct:
+            signals.append(None)
+            continue
+        if max_std_pct is not None and max_std_pct > 0 and std_pct > max_std_pct:
+            signals.append(None)
+            continue
 
-    sub["direction"] = np.where(sub["predicted"] > sub["entry"], 1, -1)
-    sub["pnl_pct"] = sub["direction"] * (sub["actual"] - sub["entry"]) / sub["entry"] * 100.0
-    return sub
+        signals.append(1 if pred_change_pct > 0 else -1)
+
+    # Step 2: walk through bars managing a single position
+    trades = []
+    position = None  # {direction, entry_idx, entry_price, close_idx}
+
+    def close_position(exit_idx):
+        exit_price = prices[exit_idx]
+        d = position["direction"]
+        pnl_pct = d * (exit_price - position["entry_price"]) / position["entry_price"] * 100.0
+        trades.append({
+            "entry": position["entry_price"],
+            "exit": exit_price,
+            "direction": d,
+            "pnl_pct": pnl_pct,
+        })
+
+    for i in range(n):
+        signal = signals[i]
+
+        if position is not None:
+            if signal is not None:
+                if signal == position["direction"]:
+                    # same direction: extend the trade
+                    position["close_idx"] = min(i + h, n - 1)
+                else:
+                    # opposite direction: close current, open new
+                    close_position(i)
+                    position = {
+                        "direction": signal,
+                        "entry_idx": i,
+                        "entry_price": prices[i],
+                        "close_idx": min(i + h, n - 1),
+                    }
+            elif i >= position["close_idx"]:
+                # no signal and horizon reached: close naturally
+                close_position(position["close_idx"])
+                position = None
+        else:
+            if signal is not None:
+                position = {
+                    "direction": signal,
+                    "entry_idx": i,
+                    "entry_price": prices[i],
+                    "close_idx": min(i + h, n - 1),
+                }
+
+    # close any remaining open position
+    if position is not None:
+        close_position(min(position["close_idx"], n - 1))
+
+    if not trades:
+        return pd.DataFrame(columns=["entry", "exit", "direction", "pnl_pct"])
+
+    return pd.DataFrame(trades)
 
 
 def compute_metrics(trades_df, balance=Config["INITIAL_BALANCE"]):
