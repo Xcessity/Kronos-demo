@@ -7,3 +7,4 @@ results/
 equity_chart.png
 .env
 experiments/
+trade_state.json

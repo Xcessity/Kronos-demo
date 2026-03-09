@@ -60,6 +60,13 @@ class binance_broker():
 
     def signal_no_trade(self, symbol: str):
         self._close_position_and_cancel_orders(symbol)
+
+    def get_position_direction(self, symbol: str) -> int | None:
+        """Returns +1 for long, -1 for short, None for no position."""
+        amt = self._check_open_position(symbol)
+        if amt is None or amt == 0:
+            return None
+        return 1 if amt > 0 else -1
     
 
     def _available_balance(self) -> Decimal:
