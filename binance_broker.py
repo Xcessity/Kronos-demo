@@ -78,24 +78,32 @@ class binance_broker():
 
     def _check_open_position(self, symbol: str) -> float | None:
         """Returns position amount for a given symbol or None. Long = amount > 0, Short = amount < 0."""
-        positions = self.client.get_position_risk()
+        try:
+            positions = self.client.get_position_risk()
+        except ClientError as e:
+            print(f"❌ Binance API error while checking position: {e.error_message} (code {e.error_code})")
+            raise
+        except Exception as e:
+            print(f"❌ Unexpected error while checking position: {e}")
+            raise
+
         open_positions = []
-        
+
         for pos in positions:
             position_amt = float(pos['positionAmt'])
             if position_amt != 0:  # Non-zero position means open
                 open_positions.append(pos)
-        
+
         # Filter positions for the specific symbol
         open_positions = [pos for pos in open_positions if pos['symbol'] == symbol]
-        
+
         # Note: there can be only one open position per symbol when using "One-Way Mode"
         #       In "Hedge Mode" there can be two (long and short). Use only "One-Way Mode"!
         #       Change this in Binance Futures -> Position Mode
 
         if open_positions:
             return float(open_positions[0]['positionAmt'])
-        
+
         return None
     
     def _close_position_and_cancel_orders(self, symbol: str):
@@ -126,8 +134,10 @@ class binance_broker():
         
         except ClientError as e:
             print(f"❌ Binance API error while closing position: {e.error_message} (code {e.error_code})")
+            raise
         except Exception as e:
             print(f"❌ Unexpected error while closing position: {e}")
+            raise
 
 
     def _get_symbol_info(self, symbol: str) -> tuple[Decimal, Decimal, Decimal]:
@@ -229,8 +239,10 @@ class binance_broker():
             
         except ClientError as e:
             print(f"❌ Binance API error while opening position: {e.error_message} (code {e.error_code})")
+            raise
         except Exception as e:
             print(f"❌ Unexpected error while opening position: {e}")
+            raise
             
 
 

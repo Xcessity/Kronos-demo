@@ -73,13 +73,20 @@ class TradeManager:
         Reconciles saved state with actual Binance position and
         closes any expired or orphaned positions.
         """
-        actual_dir = self.broker.get_position_direction(self.symbol)
+        try:
+            actual_dir = self.broker.get_position_direction(self.symbol)
+        except Exception as e:
+            print(f"Could not check Binance position: {e}. Will retry later.")
+            return
 
         if self.position is None:
             # No saved state — check for orphaned Binance position
             if actual_dir is not None:
                 print(f"Orphaned position detected on Binance (direction={actual_dir}). Closing.")
-                self.broker.signal_no_trade(self.symbol)
+                try:
+                    self.broker.signal_no_trade(self.symbol)
+                except Exception as e:
+                    print(f"Failed to close orphaned position: {e}. Will retry later.")
             return
 
         # Saved state exists
@@ -93,15 +100,21 @@ class TradeManager:
         if actual_dir != self.position["direction"]:
             # Direction mismatch — should not happen, close and clear
             print(f"Direction mismatch: state={self.position['direction']}, Binance={actual_dir}. Closing.")
-            self.broker.signal_no_trade(self.symbol)
-            self._clear_state()
+            try:
+                self.broker.signal_no_trade(self.symbol)
+                self._clear_state()
+            except Exception as e:
+                print(f"Failed to close mismatched position: {e}. Will retry later.")
             return
 
         # Check expiry
         if current_time >= self.position["expire_time"]:
             print(f"Position expired (expire_time={self.position['expire_time']}). Closing.")
-            self.broker.signal_no_trade(self.symbol)
-            self._clear_state()
+            try:
+                self.broker.signal_no_trade(self.symbol)
+                self._clear_state()
+            except Exception as e:
+                print(f"Failed to close expired position: {e}. Will retry later.")
         else:
             remaining = self.position["expire_time"] - current_time
             print(f"Position still active. Direction={'LONG' if self.position['direction'] == 1 else 'SHORT'}, "
@@ -129,10 +142,18 @@ class TradeManager:
                     # Opposite direction: close current, open new
                     side = "BUY" if signal == 1 else "SELL"
                     print(f"Opposite signal received. Reversing to {side}.")
-                    if signal == 1:
-                        self.broker.signal_buy(self.symbol, self.leverage, self.stop_loss_pct)
-                    else:
-                        self.broker.signal_sell(self.symbol, self.leverage, self.stop_loss_pct)
+                    try:
+                        if signal == 1:
+                            self.broker.signal_buy(self.symbol, self.leverage, self.stop_loss_pct)
+                        else:
+                            self.broker.signal_sell(self.symbol, self.leverage, self.stop_loss_pct)
+                    except Exception as e:
+                        # signal_buy/sell closes the old position then opens new one.
+                        # On failure we don't know which step failed — clear state as
+                        # the safe default (flat > phantom position).
+                        print(f"Failed to reverse position: {e}. Clearing state.")
+                        self._clear_state()
+                        return
                     self.position = {
                         "direction": signal,
                         "entry_time": current_time,
@@ -142,7 +163,11 @@ class TradeManager:
             elif current_time >= self.position["expire_time"]:
                 # No signal and horizon reached: close naturally
                 print(f"Horizon reached (expire_time={self.position['expire_time']}). Closing position.")
-                self.broker.signal_no_trade(self.symbol)
+                try:
+                    self.broker.signal_no_trade(self.symbol)
+                except Exception as e:
+                    print(f"Failed to close expired position: {e}. Will retry next candle.")
+                    return
                 self._clear_state()
             # else: no signal, not expired — do nothing
 
@@ -151,10 +176,14 @@ class TradeManager:
                 # No position, new signal: open
                 side = "BUY" if signal == 1 else "SELL"
                 print(f"Opening {side} position. Horizon expires at {self._expire_time(current_time)}.")
-                if signal == 1:
-                    self.broker.signal_buy(self.symbol, self.leverage, self.stop_loss_pct)
-                else:
-                    self.broker.signal_sell(self.symbol, self.leverage, self.stop_loss_pct)
+                try:
+                    if signal == 1:
+                        self.broker.signal_buy(self.symbol, self.leverage, self.stop_loss_pct)
+                    else:
+                        self.broker.signal_sell(self.symbol, self.leverage, self.stop_loss_pct)
+                except Exception as e:
+                    print(f"Failed to open {side} position: {e}. No state change.")
+                    return
                 self.position = {
                     "direction": signal,
                     "entry_time": current_time,

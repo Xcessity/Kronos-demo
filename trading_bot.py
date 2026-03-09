@@ -149,7 +149,10 @@ def main(model):
     )
 
     # Check for expired/orphaned positions on startup
-    manager.check_expired(datetime.now(timezone.utc))
+    try:
+        manager.check_expired(datetime.now(timezone.utc))
+    except Exception as e:
+        print(f"Startup position check failed: {e}. Will retry in main loop.")
 
     last_candle_time = None
 
