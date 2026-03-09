@@ -103,7 +103,8 @@ def run_evaluation(candles_df, predictor):
         volume_mean = volume_preds.mean(axis=1).values
         volume_std = volume_preds.std(axis=1).values
 
-        row = {"timestamp": anchor_ts, "actual_close": close_lookup.get(anchor_ts)}
+        actual_close = close_lookup.get(anchor_ts)
+        row = {"timestamp": anchor_ts, "actual_close": actual_close}
         for h in range(pred_horizon):
             target_ts = anchor_ts + pd.Timedelta(hours=h + 1)
             row[f"close_mean_h{h+1}"] = close_mean[h]
@@ -111,6 +112,10 @@ def run_evaluation(candles_df, predictor):
             row[f"volume_mean_h{h+1}"] = volume_mean[h]
             row[f"volume_std_h{h+1}"] = volume_std[h]
             row[f"actual_close_h{h+1}"] = close_lookup.get(target_ts)
+            if actual_close is not None:
+                row[f"upside_probability_h{h+1}"] = (close_preds[h] > actual_close).sum() / n_preds
+            else:
+                row[f"upside_probability_h{h+1}"] = None
         results_rows.append(row)
 
         print(f"{elapsed:.1f}s")
