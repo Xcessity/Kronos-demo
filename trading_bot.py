@@ -9,6 +9,7 @@ from binance.client import Client
 from model import KronosTokenizer, Kronos, KronosPredictor
 from binance_broker import binance_broker
 from trade_manager import TradeManager
+from bookkeeper import Bookkeeper
 
 # --- Configuration ---
 Config = {
@@ -26,6 +27,8 @@ Config = {
     "LEVERAGE": 1,
     "STOP_LOSS_PCT": 1.4,
     "STATE_FILE": "trade_state.json",
+    "TRADE_LOG": "trade_log.csv",
+    "INITIAL_BALANCE": 1000.0,
 }
 
 
@@ -138,6 +141,7 @@ def main(model):
     SEC = os.getenv("BINANCE_LIVE_API_SECRET")
     USE_TESTNET = os.getenv("USE_TESTNET", "true").lower() == "true"
     broker = binance_broker(key=KEY, secret=SEC, use_testnet=USE_TESTNET)
+    bookkeeper = Bookkeeper(csv_file=Config["TRADE_LOG"], initial_balance=Config["INITIAL_BALANCE"])
     manager = TradeManager(
         broker=broker,
         symbol=Config["SYMBOL"],
@@ -146,6 +150,7 @@ def main(model):
         horizon=Config["PRED_HORIZON"],
         timeframe_hours=1,
         state_file=Config["STATE_FILE"],
+        bookkeeper=bookkeeper,
     )
 
     # Check for expired/orphaned positions on startup

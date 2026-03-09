@@ -13,7 +13,8 @@ class TradeManager:
     """
 
     def __init__(self, broker, symbol: str, leverage: int, stop_loss_pct: float,
-                 horizon: int, timeframe_hours: int = 1, state_file: str = "trade_state.json"):
+                 horizon: int, timeframe_hours: int = 1, state_file: str = "trade_state.json",
+                 bookkeeper=None):
         self.broker = broker
         self.symbol = symbol
         self.leverage = leverage
@@ -21,6 +22,7 @@ class TradeManager:
         self.horizon = horizon                  # number of candle periods
         self.timeframe_hours = timeframe_hours  # hours per candle
         self.state_file = Path(state_file)
+        self.bookkeeper = bookkeeper
         self.position = self._load_state()
 
     # ── state persistence ────────────────────────────────────────────
@@ -37,6 +39,7 @@ class TradeManager:
                 "direction": data["direction"],
                 "entry_time": datetime.fromisoformat(data["entry_time"]),
                 "expire_time": datetime.fromisoformat(data["expire_time"]),
+                "entry_price": data.get("entry_price"),
             }
         except (json.JSONDecodeError, KeyError, ValueError) as e:
             print(f"Warning: could not load trade state ({e}), starting fresh.")
@@ -51,6 +54,7 @@ class TradeManager:
             "direction": self.position["direction"],
             "entry_time": self.position["entry_time"].isoformat(),
             "expire_time": self.position["expire_time"].isoformat(),
+            "entry_price": self.position["entry_price"],
         }
         self.state_file.write_text(json.dumps(data, indent=2))
 
@@ -64,6 +68,22 @@ class TradeManager:
     def _expire_time(self, current_time: datetime) -> datetime:
         """Calculate expiry time: current_time + horizon * timeframe."""
         return current_time + timedelta(hours=self.horizon * self.timeframe_hours)
+
+    def _record_close(self, exit_time, exit_price: float | None):
+        """Record a closed trade to the bookkeeper if available."""
+        if self.bookkeeper is None or self.position is None:
+            return
+        entry_price = self.position.get("entry_price")
+        if entry_price is None or exit_price is None:
+            print("Warning: missing price data, trade not recorded in log.")
+            return
+        self.bookkeeper.record_trade(
+            entry_time=self.position["entry_time"],
+            exit_time=exit_time,
+            direction=self.position["direction"],
+            entry_price=entry_price,
+            exit_price=exit_price,
+        )
 
     # ── startup / reconnection ───────────────────────────────────────
 
@@ -101,7 +121,8 @@ class TradeManager:
             # Direction mismatch — should not happen, close and clear
             print(f"Direction mismatch: state={self.position['direction']}, Binance={actual_dir}. Closing.")
             try:
-                self.broker.signal_no_trade(self.symbol)
+                exit_price = self.broker.signal_no_trade(self.symbol)
+                self._record_close(current_time, exit_price)
                 self._clear_state()
             except Exception as e:
                 print(f"Failed to close mismatched position: {e}. Will retry later.")
@@ -111,7 +132,8 @@ class TradeManager:
         if current_time >= self.position["expire_time"]:
             print(f"Position expired (expire_time={self.position['expire_time']}). Closing.")
             try:
-                self.broker.signal_no_trade(self.symbol)
+                exit_price = self.broker.signal_no_trade(self.symbol)
+                self._record_close(current_time, exit_price)
                 self._clear_state()
             except Exception as e:
                 print(f"Failed to close expired position: {e}. Will retry later.")
@@ -144,9 +166,9 @@ class TradeManager:
                     print(f"Opposite signal received. Reversing to {side}.")
                     try:
                         if signal == 1:
-                            self.broker.signal_buy(self.symbol, self.leverage, self.stop_loss_pct)
+                            close_price, entry_price = self.broker.signal_buy(self.symbol, self.leverage, self.stop_loss_pct)
                         else:
-                            self.broker.signal_sell(self.symbol, self.leverage, self.stop_loss_pct)
+                            close_price, entry_price = self.broker.signal_sell(self.symbol, self.leverage, self.stop_loss_pct)
                     except Exception as e:
                         # signal_buy/sell closes the old position then opens new one.
                         # On failure we don't know which step failed — clear state as
@@ -154,20 +176,23 @@ class TradeManager:
                         print(f"Failed to reverse position: {e}. Clearing state.")
                         self._clear_state()
                         return
+                    self._record_close(current_time, close_price)
                     self.position = {
                         "direction": signal,
                         "entry_time": current_time,
                         "expire_time": self._expire_time(current_time),
+                        "entry_price": entry_price,
                     }
                     self._save_state()
             elif current_time >= self.position["expire_time"]:
                 # No signal and horizon reached: close naturally
                 print(f"Horizon reached (expire_time={self.position['expire_time']}). Closing position.")
                 try:
-                    self.broker.signal_no_trade(self.symbol)
+                    exit_price = self.broker.signal_no_trade(self.symbol)
                 except Exception as e:
                     print(f"Failed to close expired position: {e}. Will retry next candle.")
                     return
+                self._record_close(current_time, exit_price)
                 self._clear_state()
             # else: no signal, not expired — do nothing
 
@@ -178,9 +203,9 @@ class TradeManager:
                 print(f"Opening {side} position. Horizon expires at {self._expire_time(current_time)}.")
                 try:
                     if signal == 1:
-                        self.broker.signal_buy(self.symbol, self.leverage, self.stop_loss_pct)
+                        _, entry_price = self.broker.signal_buy(self.symbol, self.leverage, self.stop_loss_pct)
                     else:
-                        self.broker.signal_sell(self.symbol, self.leverage, self.stop_loss_pct)
+                        _, entry_price = self.broker.signal_sell(self.symbol, self.leverage, self.stop_loss_pct)
                 except Exception as e:
                     print(f"Failed to open {side} position: {e}. No state change.")
                     return
@@ -188,6 +213,7 @@ class TradeManager:
                     "direction": signal,
                     "entry_time": current_time,
                     "expire_time": self._expire_time(current_time),
+                    "entry_price": entry_price,
                 }
                 self._save_state()
             # else: no position, no signal — do nothing

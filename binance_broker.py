@@ -12,54 +12,37 @@ class binance_broker():
             self.client = UMFutures(key=key, secret=secret, base_url=base_url)
 
     
-    def signal_buy(self, symbol: str, leverage: int, stop_loss_pct: float):
+    def signal_buy(self, symbol: str, leverage: int, stop_loss_pct: float) -> tuple[float | None, float | None]:
+        """Opens a long position. Returns (close_price, entry_price)."""
         open_position = self._check_open_position(symbol)
 
-        ## This code opens a position only if no position is open.
-        # if open_position and open_position > 0:
-        #     print(f"Long position already open for {symbol}. No action taken.")
-        #     return
-        
-        # if open_position and open_position < 0:
-        #     print(f"Short position already open for {symbol}. Closing position.")
-        #     self._close_position(symbol)
-        #     time.sleep(5)  # wait a bit before opening new position
-        ## END
-
-        #This code closes any open positon
+        close_price = None
         if open_position:
             print(f"Open position already exists for {symbol}. Closing position.")
-            self._close_position_and_cancel_orders(symbol)
+            close_price = self._close_position_and_cancel_orders(symbol)
             time.sleep(5)  # wait a bit before opening new position
 
-        self._open_position(symbol, side="BUY", leverage=leverage, stop_loss_pct=stop_loss_pct)
+        entry_price = self._open_position(symbol, side="BUY", leverage=leverage, stop_loss_pct=stop_loss_pct)
+        return close_price, entry_price
     
     
-    def signal_sell(self, symbol: str, leverage: int, stop_loss_pct: float):
+    def signal_sell(self, symbol: str, leverage: int, stop_loss_pct: float) -> tuple[float | None, float | None]:
+        """Opens a short position. Returns (close_price, entry_price)."""
         open_position = self._check_open_position(symbol)
 
-        ## This code opens a position only if no position is open.
-        # if open_position and open_position < 0:
-        #     print(f"Short position already open for {symbol}. No action taken.")
-        #     return
-        
-        # if open_position and open_position > 0:
-        #     print(f"Long position already open for {symbol}. Closing position.")
-        #     self._close_position(symbol)
-        #     time.sleep(5)  # wait a bit before opening new position
-        ## END
-
-        #This code closes any open positon
+        close_price = None
         if open_position:
             print(f"Open position already exists for {symbol}. Closing position.")
-            self._close_position_and_cancel_orders(symbol)
+            close_price = self._close_position_and_cancel_orders(symbol)
             time.sleep(5)  # wait a bit before opening new position
 
-        self._open_position(symbol, side="SELL", leverage=leverage, stop_loss_pct=stop_loss_pct)
+        entry_price = self._open_position(symbol, side="SELL", leverage=leverage, stop_loss_pct=stop_loss_pct)
+        return close_price, entry_price
         
 
-    def signal_no_trade(self, symbol: str):
-        self._close_position_and_cancel_orders(symbol)
+    def signal_no_trade(self, symbol: str) -> float | None:
+        """Closes any open position. Returns the fill price or None."""
+        return self._close_position_and_cancel_orders(symbol)
 
     def get_position_direction(self, symbol: str) -> int | None:
         """Returns +1 for long, -1 for short, None for no position."""
@@ -106,16 +89,16 @@ class binance_broker():
 
         return None
     
-    def _close_position_and_cancel_orders(self, symbol: str):
-        """Close any open position for the given symbol."""
+    def _close_position_and_cancel_orders(self, symbol: str) -> float | None:
+        """Close any open position for the given symbol. Returns the average fill price or None."""
         open_position_amount = self._check_open_position(symbol)
-        
+
         if not open_position_amount:
             print(f"No open position to close for {symbol}.")
-            return
-        
+            return None
+
         side = "SELL" if open_position_amount > 0 else "BUY"
-        
+
         try:
             print(f"Closing {open_position_amount} position for {symbol}...")
             order_response = self.client.new_order(
@@ -126,12 +109,15 @@ class binance_broker():
                 reduceOnly=True
             )
             print("✅ Close order placed successfully!")
+            fill_price = float(order_response.get('avgPrice', 0))
 
             # Cancel all open orders for the symbol
             print(f"Cancelling all open orders for {symbol}...")
             cancel_response = self.client.cancel_open_orders(symbol=symbol)
             print("✅ All open orders cancelled successfully!")
-        
+
+            return fill_price
+
         except ClientError as e:
             print(f"❌ Binance API error while closing position: {e.error_message} (code {e.error_code})")
             raise
@@ -158,8 +144,8 @@ class binance_broker():
         return min_qty, step, tick_size
 
 
-    def _open_position(self, symbol: str, side: str, leverage: int, stop_loss_pct: float):
-        """Open a new position."""
+    def _open_position(self, symbol: str, side: str, leverage: int, stop_loss_pct: float) -> float | None:
+        """Open a new position. Returns the average fill price or None."""
         try:
             # set leverage
             leverage_result = self.client.change_leverage(symbol=symbol, leverage=leverage)
@@ -195,7 +181,7 @@ class binance_broker():
                 print(f"Required: {min_order_value:.4f} USD")
                 print(f"Available: {max_notional:.4f} USD")
                 print("Please add more test funds to your account.")
-                return
+                return None
             
             max_affordable_qty = Decimal(max_notional / mark_price)
             qty = max_affordable_qty.quantize(step, rounding=ROUND_DOWN)
@@ -211,15 +197,11 @@ class binance_broker():
             )
 
             print(f"✅ Order ID({order.get('orderId')}) placed successfully!")
-            # print(f"Order status: {order.get('status')}")
-            # print(f"Filled qty: {order.get('executedQty')}")
-            # print(f"Average price: {order.get('avgPrice')}")
-            # print(f"Order ID: {order.get('orderId')}")
-
+            fill_price = float(order.get('avgPrice', 0))
 
             if(stop_loss_pct <= 0):
                 print("No stop loss set, skipping STOP_MARKET order placement.")
-                return
+                return fill_price
             
             # 4) Place Stop Loss order
             #wait a moment to ensure order is processed
@@ -236,7 +218,9 @@ class binance_broker():
                 newClientOrderId=f"stoploss_{int(time.time())}",
             )
             print(f"✅ Order ID({stop_order.get('orderId')}) placed successfully!")
-            
+
+            return fill_price
+
         except ClientError as e:
             print(f"❌ Binance API error while opening position: {e.error_message} (code {e.error_code})")
             raise
