@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-08_SMALL_BTCUSDT_1h_2024-01-01_2026-01-14_LB512_PRED6",
-    "HORIZONS": list(range(1, 7)),
+    "EXPERIMENT_NAME": "2026-03-08_SMALL_VANILLA_BTCUSDT_1h_LB512_PRED2",
+    "HORIZONS": list(range(1, 3)),
     "MIN_PROFIT_FACTOR": 1.1,
     "MIN_RETURN_DD_RATIO": 1.5,
 
@@ -17,7 +17,6 @@ Config = {
     "EXPERIMENTS_DIR": "experiments",
     "RESULTS_CSV": "evaluation_results.csv",
     "INITIAL_BALANCE": 1000.0,
-    "MIN_CHANGE_RANGE": np.arange(0.0, 2.05, 0.05),
     "MAX_STD_RANGE": np.arange(0.0, 2.05, 0.05),
 }
 
@@ -187,34 +186,29 @@ def baseline_metrics(df):
 
 
 def optimize_thresholds(df):
-    print("\n=== Optimizing min_change + max_std thresholds ===")
+    print("\n=== Optimizing max_std threshold ===")
     best_rows = []
     for h in Config["HORIZONS"]:
         best_pnl = -float("inf")
-        best_mc = 0.0
         best_std = 0.0
         best_metrics = None
 
-        for mc in Config["MIN_CHANGE_RANGE"]:
-            mc = round(mc, 2)
-            for ms in Config["MAX_STD_RANGE"]:
-                ms = round(ms, 2)
-                trades = compute_trades(df, h, min_change_pct=mc, max_std_pct=ms if ms > 0 else None)
-                m = compute_metrics(trades)
-                if m["profit_factor"] >= Config["MIN_PROFIT_FACTOR"] and m["return_dd_ratio"] >= Config["MIN_RETURN_DD_RATIO"] and m["total_pnl"] > best_pnl:
-                    best_pnl = m["total_pnl"]
-                    best_mc = mc
-                    best_std = ms
-                    best_metrics = m
+        for ms in Config["MAX_STD_RANGE"]:
+            ms = round(ms, 2)
+            trades = compute_trades(df, h, min_change_pct=0.0, max_std_pct=ms if ms > 0 else None)
+            m = compute_metrics(trades)
+            if m["profit_factor"] >= Config["MIN_PROFIT_FACTOR"] and m["return_dd_ratio"] >= Config["MIN_RETURN_DD_RATIO"] and m["total_pnl"] > best_pnl:
+                best_pnl = m["total_pnl"]
+                best_std = ms
+                best_metrics = m
 
         if best_metrics is None:
             print(f"  h{h:>2}: no combination with profit_factor >= {Config['MIN_PROFIT_FACTOR']} and return_dd_ratio >= {Config['MIN_RETURN_DD_RATIO']}")
             continue
         best_metrics["horizon"] = h
-        best_metrics["best_min_change_pct"] = best_mc
         best_metrics["best_max_std_pct"] = best_std
         best_rows.append(best_metrics)
-        print(f"  h{h:>2}: min_change={best_mc:.2f}%  max_std={best_std:.2f}%  "
+        print(f"  h{h:>2}: max_std={best_std:.2f}%  "
               f"trades={best_metrics['num_trades']:>5}  pnl=${best_metrics['total_pnl']:>9.2f}  "
               f"win_rate={best_metrics['win_rate']:.4f}  pf={best_metrics['profit_factor']:>7.4f}  "
               f"sharpe={best_metrics['sharpe_ratio']:>7.4f}  "
@@ -230,9 +224,8 @@ def plot_equity_charts(df, optimized_df):
 
     for _, row in optimized_df.iterrows():
         h = int(row["horizon"])
-        mc = row["best_min_change_pct"]
         ms = row["best_max_std_pct"]
-        trades = compute_trades(df, h, min_change_pct=mc, max_std_pct=ms if ms > 0 else None)
+        trades = compute_trades(df, h, min_change_pct=0.0, max_std_pct=ms if ms > 0 else None)
         if len(trades) == 0:
             continue
 
@@ -246,7 +239,7 @@ def plot_equity_charts(df, optimized_df):
                         where=equity >= bal, alpha=0.15, color="#4CAF50")
         ax.fill_between(range(len(equity)), bal, equity,
                         where=equity < bal, alpha=0.15, color="#F44336")
-        ax.set_title(f"Equity Curve  h{h}  |  min_change={mc:.2f}%  |  max_std={ms:.2f}%  |  "
+        ax.set_title(f"Equity Curve  h{h}  |  max_std={ms:.2f}%  |  "
                      f"PnL=${row['total_pnl']:.2f}  |  Sharpe={row['sharpe_ratio']:.2f}  |  "
                      f"Trades={int(row['num_trades'])}", fontsize=11)
         ax.set_xlabel("Trade #")
@@ -276,11 +269,14 @@ if __name__ == "__main__":
 
     optimized_df = optimize_thresholds(df)
     opt_path = results_dir / "performance_optimized.csv"
-    opt_order = ["horizon", "best_min_change_pct", "best_max_std_pct", "num_trades", "win_rate",
+    opt_order = ["horizon", "best_max_std_pct", "num_trades", "win_rate",
                  "profit_factor", "max_drawdown", "return_dd_ratio", "sharpe_ratio",
                  "final_equity", "total_pnl", "gross_profit", "gross_loss"]
-    optimized_df[opt_order].to_csv(opt_path, index=False)
-    print(f"Saved optimized metrics to {opt_path.name}")
+    if optimized_df.empty:
+        print("\nNo horizons passed the profit_factor / return_dd_ratio filters.")
+    else:
+        optimized_df[opt_order].to_csv(opt_path, index=False)
+        print(f"Saved optimized metrics to {opt_path.name}")
+        plot_equity_charts(df, optimized_df)
 
-    plot_equity_charts(df, optimized_df)
     print("\nDone.")
