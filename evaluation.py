@@ -20,8 +20,9 @@ Config = {
     "HIST_POINTS": 512,
     "PRED_HORIZON": 6, # hours ahead to predict (set to 1 for next hour)
     "N_PREDICTIONS": 100,
+    "TOP_P": 0.9,
     "CANDLE_CSV": "D:/Projects/Cryptobot/Kronos/data/BTCUSDT_1h_20250820_to_20260309.csv",
-    "RESULTS_DIR": "experiments/2026-03-10_SMALL_VANILLA_UPSIDE_BTCUSDT_1h_LB512_PRED6_NPRED100",
+    "RESULTS_DIR": "experiments/2026-03-10_SMALL_VANILLA_UPSIDE_BTCUSDT_1h_LB512_PRED6_NPRED100_TOPP09",
     "RESULTS_CSV": "evaluation_results.csv",
     "USE_LOCAL_MODEL_ONLY": False # if True, only load model from local MODEL_PATH (no Hugging Face download)
 }
@@ -92,7 +93,7 @@ def run_evaluation(candles_df, predictor):
         with torch.no_grad():
             close_preds, volume_preds = predictor.predict(
                 df=x_df, x_timestamp=x_timestamp, y_timestamp=y_timestamp,
-                pred_len=pred_horizon, T=1.0, top_p=0.95,
+                pred_len=pred_horizon, T=1.0, top_p=Config["TOP_P"],
                 sample_count=n_preds, verbose=False,
             )
 
