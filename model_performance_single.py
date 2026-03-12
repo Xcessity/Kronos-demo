@@ -7,10 +7,10 @@ from pathlib import Path
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-04_SMALL_VANILLA_BTCUSDT_1h_LB512_HIST12",
-    "PRED_HORIZON": 9,
+    "EXPERIMENT_NAME": "2026-03-10_SMALL_VANILLA_UPSIDE_BTCUSDT_1h_LB512_PRED6_NPRED100_TOPP09",
+    "PRED_HORIZON": 6,
     "MIN_CHANGE_PCT": 0.0,
-    "MAX_STD_PCT": 0.7,
+    "MAX_STD_PCT": 0.45,
 
     "REPO_PATH": Path(__file__).parent.resolve(),
     "EXPERIMENTS_DIR": "experiments",

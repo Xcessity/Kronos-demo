@@ -1,3 +1,4 @@
+import itertools
 from pathlib import Path
 
 import numpy as np
@@ -8,7 +9,7 @@ import matplotlib.pyplot as plt
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-09_SMALL_VANILLA_BTCUSDT_1h_LB512_PRED6_NPRED100",
+    "EXPERIMENT_NAME": "2026-03-10_SMALL_VANILLA_UPSIDE_BTCUSDT_1h_LB512_PRED6_NPRED100_TOPP095",
     "HORIZONS": list(range(1, 7)),
     "MIN_PROFIT_FACTOR": 1.1,
     "MIN_RETURN_DD_RATIO": 1.5,
@@ -17,7 +18,20 @@ Config = {
     "EXPERIMENTS_DIR": "experiments",
     "RESULTS_CSV": "evaluation_results.csv",
     "INITIAL_BALANCE": 1000.0,
-    "MAX_STD_RANGE": np.arange(0.0, 2.05, 0.05),
+    "OPTIMIZATION_CRITERIA": {
+        "close_std": {
+            "enabled": True,
+            "range": np.arange(0.0, 2.05, 0.05),
+        },
+        "close_mean": {
+            "enabled": False,
+            "range": np.arange(0.0, 1.05, 0.05),
+        },
+        "upside_probability": {
+            "enabled": False,
+            "range": np.arange(0.50, 0.95, 0.05),
+        },
+    },
 }
 
 
@@ -29,10 +43,15 @@ def load_data():
     return df
 
 
-def compute_trades(df, horizon, min_change_pct=0.0, max_std_pct=None):
+def compute_trades(df, horizon, min_change_pct=0.0, max_std_pct=None, min_upside_prob=None):
     col_pred = f"close_mean_h{horizon}"
     col_std = f"close_std_h{horizon}"
+    col_upside = f"upside_probability_h{horizon}"
     col_entry = "actual_close"
+
+    if min_upside_prob is not None and col_upside not in df.columns:
+        raise ValueError(f"Column '{col_upside}' not found in data. "
+                         "Cannot filter by upside_probability.")
 
     prices = df[col_entry].values
     n = len(df)
@@ -58,6 +77,19 @@ def compute_trades(df, horizon, min_change_pct=0.0, max_std_pct=None):
         if max_std_pct is not None and max_std_pct > 0 and std_pct > max_std_pct:
             signals.append(None)
             continue
+
+        # upside_probability filter: longs need prob >= threshold, shorts need prob <= (1 - threshold)
+        if min_upside_prob is not None:
+            upside_prob = row[col_upside]
+            if pd.isna(upside_prob):
+                signals.append(None)
+                continue
+            if pred_change_pct > 0 and upside_prob < min_upside_prob:
+                signals.append(None)
+                continue
+            if pred_change_pct < 0 and upside_prob > (1.0 - min_upside_prob):
+                signals.append(None)
+                continue
 
         signals.append(1 if pred_change_pct > 0 else -1)
 
@@ -186,29 +218,63 @@ def baseline_metrics(df):
 
 
 def optimize_thresholds(df):
-    print("\n=== Optimizing max_std threshold ===")
+    criteria = Config["OPTIMIZATION_CRITERIA"]
+
+    # Build sweep axes from enabled criteria
+    axes = []
+    for name, cfg in criteria.items():
+        if cfg["enabled"]:
+            axes.append((name, [round(v, 4) for v in cfg["range"]]))
+
+    if not axes:
+        print("\nNo optimization criteria enabled.")
+        return pd.DataFrame()
+
+    axis_names = [a[0] for a in axes]
+    axis_values = [a[1] for a in axes]
+    total_combos = int(np.prod([len(v) for v in axis_values]))
+
+    print(f"\n=== Optimizing thresholds: {', '.join(axis_names)} ===")
+    print(f"    Search space: {' x '.join(str(len(v)) for v in axis_values)} = "
+          f"{total_combos} combinations per horizon")
+
     best_rows = []
     for h in Config["HORIZONS"]:
         best_pnl = -float("inf")
-        best_std = 0.0
+        best_params = {}
         best_metrics = None
 
-        for ms in Config["MAX_STD_RANGE"]:
-            ms = round(ms, 2)
-            trades = compute_trades(df, h, min_change_pct=0.0, max_std_pct=ms if ms > 0 else None)
+        for combo in itertools.product(*axis_values):
+            params = dict(zip(axis_names, combo))
+
+            kwargs = {
+                "min_change_pct": params.get("close_mean", 0.0),
+                "max_std_pct": params.get("close_std", None) if params.get("close_std", 0) > 0 else None,
+                "min_upside_prob": params.get("upside_probability", None),
+            }
+
+            trades = compute_trades(df, h, **kwargs)
             m = compute_metrics(trades)
-            if m["profit_factor"] >= Config["MIN_PROFIT_FACTOR"] and m["return_dd_ratio"] >= Config["MIN_RETURN_DD_RATIO"] and m["total_pnl"] > best_pnl:
+
+            if (m["profit_factor"] >= Config["MIN_PROFIT_FACTOR"]
+                    and m["return_dd_ratio"] >= Config["MIN_RETURN_DD_RATIO"]
+                    and m["total_pnl"] > best_pnl):
                 best_pnl = m["total_pnl"]
-                best_std = ms
+                best_params = params
                 best_metrics = m
 
         if best_metrics is None:
-            print(f"  h{h:>2}: no combination with profit_factor >= {Config['MIN_PROFIT_FACTOR']} and return_dd_ratio >= {Config['MIN_RETURN_DD_RATIO']}")
+            print(f"  h{h:>2}: no combination with profit_factor >= {Config['MIN_PROFIT_FACTOR']} "
+                  f"and return_dd_ratio >= {Config['MIN_RETURN_DD_RATIO']}")
             continue
+
         best_metrics["horizon"] = h
-        best_metrics["best_max_std_pct"] = best_std
+        for name, val in best_params.items():
+            best_metrics[f"best_{name}"] = val
         best_rows.append(best_metrics)
-        print(f"  h{h:>2}: max_std={best_std:.2f}%  "
+
+        param_str = "  ".join(f"{k}={v:.4f}" for k, v in best_params.items())
+        print(f"  h{h:>2}: {param_str}  "
               f"trades={best_metrics['num_trades']:>5}  pnl=${best_metrics['total_pnl']:>9.2f}  "
               f"win_rate={best_metrics['win_rate']:.4f}  pf={best_metrics['profit_factor']:>7.4f}  "
               f"sharpe={best_metrics['sharpe_ratio']:>7.4f}  "
@@ -224,12 +290,29 @@ def plot_equity_charts(df, optimized_df):
 
     for _, row in optimized_df.iterrows():
         h = int(row["horizon"])
-        ms = row["best_max_std_pct"]
-        trades = compute_trades(df, h, min_change_pct=0.0, max_std_pct=ms if ms > 0 else None)
+
+        # Build compute_trades kwargs from dynamic best_* columns
+        kwargs = {}
+        if "best_close_std" in row.index:
+            ms = row["best_close_std"]
+            kwargs["max_std_pct"] = ms if ms > 0 else None
+        if "best_close_mean" in row.index:
+            kwargs["min_change_pct"] = row["best_close_mean"]
+        if "best_upside_probability" in row.index:
+            kwargs["min_upside_prob"] = row["best_upside_probability"]
+
+        trades = compute_trades(df, h, **kwargs)
         if len(trades) == 0:
             continue
 
         equity = build_equity_curve(trades)
+
+        # Build dynamic title from active criteria
+        param_parts = []
+        for col in row.index:
+            if col.startswith("best_"):
+                param_parts.append(f"{col[5:]}={row[col]:.4f}")
+        param_str = "  |  ".join(param_parts) if param_parts else "no filter"
 
         fig, ax = plt.subplots(figsize=(12, 5))
         ax.plot(equity, linewidth=1.0, color="#2196F3")
@@ -239,7 +322,7 @@ def plot_equity_charts(df, optimized_df):
                         where=equity >= bal, alpha=0.15, color="#4CAF50")
         ax.fill_between(range(len(equity)), bal, equity,
                         where=equity < bal, alpha=0.15, color="#F44336")
-        ax.set_title(f"Equity Curve  h{h}  |  max_std={ms:.2f}%  |  "
+        ax.set_title(f"Equity Curve  h{h}  |  {param_str}  |  "
                      f"PnL=${row['total_pnl']:.2f}  |  Sharpe={row['sharpe_ratio']:.2f}  |  "
                      f"Trades={int(row['num_trades'])}", fontsize=11)
         ax.set_xlabel("Trade #")
@@ -269,12 +352,15 @@ if __name__ == "__main__":
 
     optimized_df = optimize_thresholds(df)
     opt_path = results_dir / "performance_optimized.csv"
-    opt_order = ["horizon", "best_max_std_pct", "num_trades", "win_rate",
-                 "profit_factor", "max_drawdown", "return_dd_ratio", "sharpe_ratio",
-                 "final_equity", "total_pnl", "gross_profit", "gross_loss"]
     if optimized_df.empty:
         print("\nNo horizons passed the profit_factor / return_dd_ratio filters.")
     else:
+        # Build column order dynamically based on active criteria
+        best_cols = [c for c in optimized_df.columns if c.startswith("best_")]
+        opt_order = ["horizon"] + best_cols + [
+            "num_trades", "win_rate", "profit_factor", "max_drawdown",
+            "return_dd_ratio", "sharpe_ratio", "final_equity", "total_pnl",
+            "gross_profit", "gross_loss"]
         optimized_df[opt_order].to_csv(opt_path, index=False)
         print(f"Saved optimized metrics to {opt_path.name}")
         plot_equity_charts(df, optimized_df)
