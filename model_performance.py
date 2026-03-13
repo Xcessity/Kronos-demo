@@ -1,4 +1,6 @@
 import itertools
+import shutil
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -9,8 +11,8 @@ import matplotlib.pyplot as plt
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-10_SMALL_VANILLA_UPSIDE_BTCUSDT_1h_LB512_PRED6_NPRED100_TOPP095",
-    "HORIZONS": list(range(1, 7)),
+    "EXPERIMENT_NAME": "2026-03-11_SMALL_BTCUSDT_1h_2021-01-01_2025-12-01_LB512_PRED16",
+    "HORIZONS": list(range(1, 17)),
     "MIN_PROFIT_FACTOR": 1.1,
     "MIN_RETURN_DD_RATIO": 1.5,
 
@@ -24,7 +26,7 @@ Config = {
             "range": np.arange(0.0, 2.05, 0.05),
         },
         "close_mean": {
-            "enabled": False,
+            "enabled": True,
             "range": np.arange(0.0, 1.05, 0.05),
         },
         "upside_probability": {
@@ -283,10 +285,9 @@ def optimize_thresholds(df):
     return pd.DataFrame(best_rows)
 
 
-def plot_equity_charts(df, optimized_df):
+def plot_equity_charts(df, optimized_df, run_dir: Path):
     print("\n=== Generating equity charts ===")
-    results_dir = Config["REPO_PATH"] / Config["EXPERIMENTS_DIR"] / Config["EXPERIMENT_NAME"]
-    results_dir.mkdir(parents=True, exist_ok=True)
+    results_dir = run_dir
 
     for _, row in optimized_df.iterrows():
         h = int(row["horizon"])
@@ -337,13 +338,21 @@ def plot_equity_charts(df, optimized_df):
 
 
 if __name__ == "__main__":
+    run_dir = (
+        Config["REPO_PATH"]
+        / "performance_runs"
+        / Config["EXPERIMENT_NAME"]
+        / datetime.now().strftime("%Y%m%d_%H%M%S")
+    )
+    run_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(__file__, run_dir / "model_performance.py")
+    print(f"Run output dir: {run_dir}")
+
     df = load_data()
 
     baseline_df = baseline_metrics(df)
-    results_dir = Config["REPO_PATH"] / Config["EXPERIMENTS_DIR"] / Config["EXPERIMENT_NAME"]
-    results_dir.mkdir(parents=True, exist_ok=True)
 
-    baseline_path = results_dir / "performance_baseline.csv"
+    baseline_path = run_dir / "performance_baseline.csv"
     col_order = ["horizon", "num_trades", "win_rate", "profit_factor", "max_drawdown",
                  "return_dd_ratio", "sharpe_ratio", "final_equity", "total_pnl",
                  "gross_profit", "gross_loss"]
@@ -351,7 +360,7 @@ if __name__ == "__main__":
     print(f"\nSaved baseline metrics to {baseline_path.name}")
 
     optimized_df = optimize_thresholds(df)
-    opt_path = results_dir / "performance_optimized.csv"
+    opt_path = run_dir / "performance_optimized.csv"
     if optimized_df.empty:
         print("\nNo horizons passed the profit_factor / return_dd_ratio filters.")
     else:
@@ -363,6 +372,6 @@ if __name__ == "__main__":
             "gross_profit", "gross_loss"]
         optimized_df[opt_order].to_csv(opt_path, index=False)
         print(f"Saved optimized metrics to {opt_path.name}")
-        plot_equity_charts(df, optimized_df)
+        plot_equity_charts(df, optimized_df, run_dir)
 
     print("\nDone.")

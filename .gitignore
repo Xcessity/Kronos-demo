@@ -1,3 +1,4 @@
+performance_runs/
 venv/
 .claude/
 model/__pycache__/
