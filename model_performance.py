@@ -20,6 +20,8 @@ Config = {
     "EXPERIMENTS_DIR": "experiments",
     "RESULTS_CSV": "evaluation_results.csv",
     "INITIAL_BALANCE": 1000.0,
+    "TRADING_FEE_PCT": 0.045,  # fee per trade in %, applied on entry and exit (round-trip = 2x)
+    "LEVERAGE": 1,             # leverage multiplier
     "OPTIMIZATION_CRITERIA": {
         "close_std": {
             "enabled": True,
@@ -99,10 +101,14 @@ def compute_trades(df, horizon, min_change_pct=0.0, max_std_pct=None, min_upside
     trades = []
     position = None  # {direction, entry_idx, entry_price, close_idx}
 
+    leverage = Config["LEVERAGE"]
+    fee_pct = Config["TRADING_FEE_PCT"]
+
     def close_position(exit_idx):
         exit_price = prices[exit_idx]
         d = position["direction"]
-        pnl_pct = d * (exit_price - position["entry_price"]) / position["entry_price"] * 100.0
+        raw_pnl_pct = d * (exit_price - position["entry_price"]) / position["entry_price"] * 100.0
+        pnl_pct = raw_pnl_pct * leverage - 2 * fee_pct
         trades.append({
             "entry": position["entry_price"],
             "exit": exit_price,
