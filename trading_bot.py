@@ -13,19 +13,24 @@ from bookkeeper import Bookkeeper
 
 # --- Configuration ---
 Config = {
-    "TOKENIZER": "NeoQuasar/Kronos-Tokenizer-base",
-    "MODEL": "NeoQuasar/Kronos-small",
+    # The bot uses the 2026-03-13_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB400_PRED12 model
+    # NOTE: it is intentionally fed with 512 historical points, the evaluation results show better performance
+    # Evaluation used: 2026-03-13_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB512_PRED12
+
+    "TOKENIZER": "NeoQuasar/Kronos-Tokenizer-2k",
+    "MODEL": "NeoQuasar/Kronos-mini",
     "MODEL_PATH": "../Kronos_model",
-    "SYMBOL": "BTCUSDT",
+    "PREDICTION_SYMBOL": "BTCUSDT",
+    "TRADE_SYMBOL": "BTCUSDC",
     "TIMEFRAME": "1h",
-    "HIST_POINTS": 360,
+    "HIST_POINTS": 512,
     "RETRY_INTERVAL": 10,  # seconds between retries for new candle
-    "PRED_HORIZON": 1, # hours ahead to predict (set to 1 for next hour)
-    "N_PREDICTIONS": 30,
-    "MIN_PRICE_CHANGE_PCT": 0.40, # minimum predicted price change percentage to consider for trading
-    "MAX_PRICE_STD_PCT": 0.60, # maximum predicted price change std percentage to consider for trading
+    "PRED_HORIZON": 7, # hours ahead to predict (set to 1 for next hour)
+    "N_PREDICTIONS": 100,
+    "MIN_PRICE_CHANGE_PCT": 0.7, # minimum predicted price change percentage to consider for trading
+    "MAX_PRICE_STD_PCT": 1.05, # maximum predicted price change std percentage to consider for trading
     "LEVERAGE": 1,
-    "STOP_LOSS_PCT": 1.4,
+    "STOP_LOSS_PCT": 0,
     "STATE_FILE": "trade_state.json",
     "TRADE_LOG": "trade_log.csv",
     "INITIAL_BALANCE": 1000.0,
@@ -132,7 +137,7 @@ def wait_for_new_candle(client, symbol, timeframe, num_candles, last_candle_time
 
 def main(model):
     load_dotenv()
-    print(f"Starting trading bot | {Config['SYMBOL']} | {Config['TIMEFRAME']} | {Config['HIST_POINTS']} candles")
+    print(f"Starting trading bot | Predict: {Config['PREDICTION_SYMBOL']} | Trade: {Config['TRADE_SYMBOL']} | {Config['TIMEFRAME']} | {Config['HIST_POINTS']} candles")
 
     client = Client()
 
@@ -144,7 +149,7 @@ def main(model):
     bookkeeper = Bookkeeper(csv_file=Config["TRADE_LOG"], initial_balance=Config["INITIAL_BALANCE"])
     manager = TradeManager(
         broker=broker,
-        symbol=Config["SYMBOL"],
+        symbol=Config["TRADE_SYMBOL"],
         leverage=Config["LEVERAGE"],
         stop_loss_pct=Config["STOP_LOSS_PCT"],
         horizon=Config["PRED_HORIZON"],
@@ -163,7 +168,7 @@ def main(model):
 
     # Initial fetch
     try:
-        df = fetch_candles(client, Config['SYMBOL'], Config['TIMEFRAME'], Config['HIST_POINTS'])
+        df = fetch_candles(client, Config['PREDICTION_SYMBOL'], Config['TIMEFRAME'], Config['HIST_POINTS'])
         last_candle_time = df["timestamps"].iloc[-1]
         print(f"Initial fetch complete. Latest candle: {last_candle_time} | Shape: {df.shape}")
     except Exception as e:
@@ -176,7 +181,7 @@ def main(model):
             # Check for expired positions after sleeping (handles connection loss / long sleep)
             manager.check_expired(datetime.now(timezone.utc))
 
-            df = wait_for_new_candle(client, Config['SYMBOL'], Config['TIMEFRAME'], Config['HIST_POINTS'], last_candle_time)
+            df = wait_for_new_candle(client, Config['PREDICTION_SYMBOL'], Config['TIMEFRAME'], Config['HIST_POINTS'], last_candle_time)
             last_candle_time = df["timestamps"].iloc[-1]
             last_candle_close = df["close"].iloc[-1]
             print(f"Candles updated. Latest: {last_candle_time} | Shape: {df.shape}")

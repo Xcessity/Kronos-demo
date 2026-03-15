@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-11_SMALL_BTCUSDT_1h_2021-01-01_2025-12-01_LB512_PRED16",
-    "HORIZONS": list(range(1, 17)),
+    "EXPERIMENT_NAME": "2026-03-13_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB512_PRED12",
+    "HORIZONS": list(range(7, 8)),
     "MIN_PROFIT_FACTOR": 1.1,
     "MIN_RETURN_DD_RATIO": 1.5,
 
@@ -20,16 +20,16 @@ Config = {
     "EXPERIMENTS_DIR": "experiments",
     "RESULTS_CSV": "evaluation_results.csv",
     "INITIAL_BALANCE": 1000.0,
-    "TRADING_FEE_PCT": 0.045,  # fee per trade in %, applied on entry and exit (round-trip = 2x)
+    "TRADING_FEE_PCT": 0.05,  # fee per trade in %, applied on entry and exit (round-trip = 2x)
     "LEVERAGE": 1,             # leverage multiplier
     "OPTIMIZATION_CRITERIA": {
         "close_std": {
             "enabled": True,
-            "range": np.arange(0.0, 2.05, 0.05),
+            "range": np.arange(0.0, 2.05, 0.01),
         },
         "close_mean": {
             "enabled": True,
-            "range": np.arange(0.0, 1.05, 0.05),
+            "range": np.arange(0.0, 1.05, 0.01),
         },
         "upside_probability": {
             "enabled": False,
@@ -329,9 +329,11 @@ def plot_equity_charts(df, optimized_df, run_dir: Path):
                         where=equity >= bal, alpha=0.15, color="#4CAF50")
         ax.fill_between(range(len(equity)), bal, equity,
                         where=equity < bal, alpha=0.15, color="#F44336")
+        fig.suptitle(Config["EXPERIMENT_NAME"], fontsize=13, fontweight="bold")
         ax.set_title(f"Equity Curve  h{h}  |  {param_str}  |  "
                      f"PnL=${row['total_pnl']:.2f}  |  Sharpe={row['sharpe_ratio']:.2f}  |  "
-                     f"Trades={int(row['num_trades'])}", fontsize=11)
+                     f"Ret/DD={row['return_dd_ratio']:.2f}  |  PF={row['profit_factor']:.2f}  |  "
+                     f"Trades={int(row['num_trades'])}", fontsize=10)
         ax.set_xlabel("Trade #")
         ax.set_ylabel("Equity (USD)")
         ax.grid(True, alpha=0.3)
