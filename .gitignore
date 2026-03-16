@@ -9,3 +9,4 @@ equity_chart.png
 .env
 experiments/
 trade_state.json
+__pycache__/

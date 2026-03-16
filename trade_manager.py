@@ -35,10 +35,17 @@ class TradeManager:
             data = json.loads(self.state_file.read_text())
             if not data:
                 return None
+            entry_time = datetime.fromisoformat(data["entry_time"])
+            expire_time = datetime.fromisoformat(data["expire_time"])
+            # Ensure timestamps are UTC-aware (handles legacy naive timestamps)
+            if entry_time.tzinfo is None:
+                entry_time = entry_time.replace(tzinfo=timezone.utc)
+            if expire_time.tzinfo is None:
+                expire_time = expire_time.replace(tzinfo=timezone.utc)
             return {
                 "direction": data["direction"],
-                "entry_time": datetime.fromisoformat(data["entry_time"]),
-                "expire_time": datetime.fromisoformat(data["expire_time"]),
+                "entry_time": entry_time,
+                "expire_time": expire_time,
                 "entry_price": data.get("entry_price"),
             }
         except (json.JSONDecodeError, KeyError, ValueError) as e:
