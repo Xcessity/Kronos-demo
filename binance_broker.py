@@ -110,6 +110,12 @@ class binance_broker():
             )
             print("✅ Close order placed successfully!")
             fill_price = float(order_response.get('avgPrice', 0))
+            if fill_price == 0 and order_response.get('fills'):
+                total_qty = sum(float(f['qty']) for f in order_response['fills'])
+                total_cost = sum(float(f['price']) * float(f['qty']) for f in order_response['fills'])
+                fill_price = total_cost / total_qty if total_qty > 0 else 0
+            if fill_price == 0:
+                print("Warning: could not determine fill price from order response.")
 
             # Cancel all open orders for the symbol
             print(f"Cancelling all open orders for {symbol}...")
@@ -198,6 +204,12 @@ class binance_broker():
 
             print(f"✅ Order ID({order.get('orderId')}) placed successfully!")
             fill_price = float(order.get('avgPrice', 0))
+            if fill_price == 0 and order.get('fills'):
+                total_qty = sum(float(f['qty']) for f in order['fills'])
+                total_cost = sum(float(f['price']) * float(f['qty']) for f in order['fills'])
+                fill_price = total_cost / total_qty if total_qty > 0 else 0
+            if fill_price == 0:
+                print("Warning: could not determine fill price from order response.")
 
             if(stop_loss_pct <= 0):
                 print("No stop loss set, skipping STOP_MARKET order placement.")

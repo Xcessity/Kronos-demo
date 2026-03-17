@@ -81,8 +81,8 @@ class TradeManager:
         if self.bookkeeper is None or self.position is None:
             return
         entry_price = self.position.get("entry_price")
-        if entry_price is None or exit_price is None:
-            print("Warning: missing price data, trade not recorded in log.")
+        if not entry_price or not exit_price:
+            print("Warning: missing or zero price data, trade not recorded in log.")
             return
         self.bookkeeper.record_trade(
             entry_time=self.position["entry_time"],
