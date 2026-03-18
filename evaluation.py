@@ -14,17 +14,17 @@ from model import KronosTokenizer, Kronos, KronosPredictor
 # --- Configuration ---
 Config = {
     "REPO_PATH": Path(__file__).parent.resolve(),
-    "TOKENIZER": "NeoQuasar/Kronos-Tokenizer-base",
-    "MODEL": "NeoQuasar/Kronos-small",
+    "TOKENIZER": "NeoQuasar/Kronos-Tokenizer-2k",
+    "MODEL": "NeoQuasar/Kronos-mini",
     "MODEL_PATH": "../Kronos_model",
-    "HIST_POINTS": 512,
-    "PRED_HORIZON": 6, # hours ahead to predict (set to 1 for next hour)
+    "HIST_POINTS": 400,
+    "PRED_HORIZON": 12, # hours ahead to predict (set to 1 for next hour)
     "N_PREDICTIONS": 100,
     "TOP_P": 0.95,
-    "CANDLE_CSV": "D:/Projects/Cryptobot/Kronos/data/BTCUSDT_1h_20250820_to_20260309.csv",
-    "RESULTS_DIR": "experiments/2026-03-10_SMALL_VANILLA_UPSIDE_BTCUSDT_1h_LB512_PRED6_NPRED100_TOPP095",
+    "CANDLE_CSV": "D:/Projects/Cryptobot/Kronos/data/BTCUSDT_1h_20210101_to_20251201_test.csv",
+    "RESULTS_DIR": "experiments/2026-03-16_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB400_PRED12_BATCH64",
     "RESULTS_CSV": "evaluation_results.csv",
-    "USE_LOCAL_MODEL_ONLY": False # if True, only load model from local MODEL_PATH (no Hugging Face download)
+    "USE_LOCAL_MODEL_ONLY": True # if True, only load model from local MODEL_PATH (no Hugging Face download)
 }
 
 
