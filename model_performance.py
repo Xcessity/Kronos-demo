@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-13_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB400_PRED12",
+    "EXPERIMENT_NAME": "2026-03-15_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB612_PRED12",
     "HORIZONS": list(range(1, 13)),
     "MIN_PROFIT_FACTOR": 1.1,
     "MIN_RETURN_DD_RATIO": 1.5,
@@ -43,8 +43,9 @@ def load_data():
     results_dir = Config["REPO_PATH"] / Config["EXPERIMENTS_DIR"] / Config["EXPERIMENT_NAME"]
     csv_path = results_dir / Config["RESULTS_CSV"]
     df = pd.read_csv(csv_path, parse_dates=["timestamp"])
-    print(f"Loaded {len(df)} rows from {csv_path.name}")
-    return df
+    eval_days = (df["timestamp"].max() - df["timestamp"].min()).days
+    print(f"Loaded {len(df)} rows from {csv_path.name} covering {eval_days} days")
+    return df, eval_days
 
 
 def compute_trades(df, horizon, min_change_pct=0.0, max_std_pct=None, min_upside_prob=None):
@@ -211,13 +212,14 @@ def build_equity_curve(trades_df, balance=Config["INITIAL_BALANCE"]):
     return balance + pnl_dollars.cumsum().values
 
 
-def baseline_metrics(df):
+def baseline_metrics(df, eval_days):
     print("\n=== Baseline metrics (no threshold) ===")
     rows = []
     for h in Config["HORIZONS"]:
         trades = compute_trades(df, h, min_change_pct=0.0)
         m = compute_metrics(trades)
         m["horizon"] = h
+        m["eval_days"] = eval_days
         rows.append(m)
         print(f"  h{h:>2}: trades={m['num_trades']:>5}  win_rate={m['win_rate']:.4f}  "
               f"pnl=${m['total_pnl']:>9.2f}  sharpe={m['sharpe_ratio']:>7.4f}  "
@@ -225,7 +227,7 @@ def baseline_metrics(df):
     return pd.DataFrame(rows)
 
 
-def optimize_thresholds(df):
+def optimize_thresholds(df, eval_days):
     criteria = Config["OPTIMIZATION_CRITERIA"]
 
     # Build sweep axes from enabled criteria
@@ -277,6 +279,7 @@ def optimize_thresholds(df):
             continue
 
         best_metrics["horizon"] = h
+        best_metrics["eval_days"] = eval_days
         for name, val in best_params.items():
             best_metrics[f"best_{name}"] = val
         best_rows.append(best_metrics)
