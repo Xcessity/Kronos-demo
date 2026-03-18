@@ -334,6 +334,7 @@ def plot_equity_charts(df, optimized_df, run_dir: Path):
                         where=equity < bal, alpha=0.15, color="#F44336")
         fig.suptitle(Config["EXPERIMENT_NAME"], fontsize=13, fontweight="bold")
         ax.set_title(f"Equity Curve  h{h}  |  {param_str}  |  "
+                     f"Days={int(row['eval_days'])}  |  "
                      f"PnL=${row['total_pnl']:.2f}  |  Sharpe={row['sharpe_ratio']:.2f}  |  "
                      f"Ret/DD={row['return_dd_ratio']:.2f}  |  PF={row['profit_factor']:.2f}  |  "
                      f"Trades={int(row['num_trades'])}", fontsize=10)
@@ -359,25 +360,25 @@ if __name__ == "__main__":
     shutil.copy(__file__, run_dir / "model_performance.py")
     print(f"Run output dir: {run_dir}")
 
-    df = load_data()
+    df, eval_days = load_data()
 
-    baseline_df = baseline_metrics(df)
+    baseline_df = baseline_metrics(df, eval_days)
 
     baseline_path = run_dir / "performance_baseline.csv"
-    col_order = ["horizon", "num_trades", "win_rate", "profit_factor", "max_drawdown",
+    col_order = ["horizon", "eval_days", "num_trades", "win_rate", "profit_factor", "max_drawdown",
                  "return_dd_ratio", "sharpe_ratio", "final_equity", "total_pnl",
                  "gross_profit", "gross_loss"]
     baseline_df[col_order].to_csv(baseline_path, index=False)
     print(f"\nSaved baseline metrics to {baseline_path.name}")
 
-    optimized_df = optimize_thresholds(df)
+    optimized_df = optimize_thresholds(df, eval_days)
     opt_path = run_dir / "performance_optimized.csv"
     if optimized_df.empty:
         print("\nNo horizons passed the profit_factor / return_dd_ratio filters.")
     else:
         # Build column order dynamically based on active criteria
         best_cols = [c for c in optimized_df.columns if c.startswith("best_")]
-        opt_order = ["horizon"] + best_cols + [
+        opt_order = ["horizon", "eval_days"] + best_cols + [
             "num_trades", "win_rate", "profit_factor", "max_drawdown",
             "return_dd_ratio", "sharpe_ratio", "final_equity", "total_pnl",
             "gross_profit", "gross_loss"]
