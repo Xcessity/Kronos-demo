@@ -24,6 +24,7 @@ Config = {
     "TRADE_SYMBOL": "BTCUSDC",
     "TIMEFRAME": "1h",
     "HIST_POINTS": 512,
+    "MAX_CONTEXT": 2048, # 512 for SMALL and BASE, 2048 for MINI
     "RETRY_INTERVAL": 10,  # seconds between retries for new candle
     "PRED_HORIZON": 7, # hours ahead to predict (set to 1 for next hour)
     "N_PREDICTIONS": 100,
@@ -47,7 +48,7 @@ def load_model():
     model.eval()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
-    predictor = KronosPredictor(model, tokenizer, device=device, max_context=512)
+    predictor = KronosPredictor(model, tokenizer, device=device, max_context=Config["MAX_CONTEXT"])
     print("Model loaded successfully.")
     return predictor
 

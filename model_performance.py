@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-16_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB400_PRED12_BATCH64",
+    "EXPERIMENT_NAME": "2026-03-19_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB300_PRED12",
     "HORIZONS": list(range(1, 13)),
     "MIN_PROFIT_FACTOR": 1.1,
     "MIN_RETURN_DD_RATIO": 1.5,
