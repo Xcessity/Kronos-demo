@@ -147,7 +147,7 @@ def main(model):
     SEC = os.getenv("BINANCE_LIVE_API_SECRET")
     USE_TESTNET = os.getenv("USE_TESTNET", "true").lower() == "true"
     broker = binance_broker(key=KEY, secret=SEC, use_testnet=USE_TESTNET)
-    bookkeeper = Bookkeeper(csv_file=Config["TRADE_LOG"], initial_balance=Config["INITIAL_BALANCE"])
+    bookkeeper = Bookkeeper(csv_file=Config["TRADE_LOG"])
     manager = TradeManager(
         broker=broker,
         symbol=Config["TRADE_SYMBOL"],
