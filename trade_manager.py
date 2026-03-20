@@ -74,15 +74,17 @@ class TradeManager:
         """Calculate expiry time: current_time + horizon * timeframe."""
         return current_time + timedelta(hours=self.horizon * self.timeframe_hours)
 
-    def _record_close(self, exit_time):
-        """Record a closed trade to the bookkeeper if available."""
+    def _record_open(self, time, direction: int):
+        """Log a trade-open event to the bookkeeper if available."""
+        if self.bookkeeper is None:
+            return
+        self.bookkeeper.record_open(time=time, direction=direction)
+
+    def _record_close(self, time):
+        """Log a trade-close event to the bookkeeper if available."""
         if self.bookkeeper is None or self.position is None:
             return
-        self.bookkeeper.record_trade(
-            entry_time=self.position["entry_time"],
-            exit_time=exit_time,
-            direction=self.position["direction"],
-        )
+        self.bookkeeper.record_close(time=time, direction=self.position["direction"])
 
     # ── startup / reconnection ───────────────────────────────────────
 
@@ -181,6 +183,7 @@ class TradeManager:
                         "entry_time": current_time,
                         "expire_time": self._expire_time(current_time),
                     }
+                    self._record_open(current_time, signal)
                     self._save_state()
             elif current_time >= self.position["expire_time"]:
                 # No signal and horizon reached: close naturally
@@ -212,5 +215,6 @@ class TradeManager:
                     "entry_time": current_time,
                     "expire_time": self._expire_time(current_time),
                 }
+                self._record_open(current_time, signal)
                 self._save_state()
             # else: no position, no signal — do nothing
