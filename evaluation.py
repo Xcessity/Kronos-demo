@@ -17,13 +17,13 @@ Config = {
     "TOKENIZER": "NeoQuasar/Kronos-Tokenizer-2k",
     "MODEL": "NeoQuasar/Kronos-mini",
     "MODEL_PATH": "../Kronos_model",
-    "HIST_POINTS": 712,
+    "HIST_POINTS": 360,
     "MAX_CONTEXT": 2048, # 512 for SMALL and BASE, 2048 for MINI
     "PRED_HORIZON": 12, # hours ahead to predict (set to 1 for next hour)
     "N_PREDICTIONS": 100,
     "TOP_P": 0.95,
     "CANDLE_CSV": "D:/Projects/Cryptobot/Kronos/data/BTCUSDT_1h_20210101_to_20251201_test.csv",
-    "RESULTS_DIR": "experiments/2026-03-15_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB712_PRED12",
+    "RESULTS_DIR": "experiments/2026-03-20_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB360_PRED12",
     "RESULTS_CSV": "evaluation_results.csv",
     "USE_LOCAL_MODEL_ONLY": True # if True, only load model from local MODEL_PATH (no Hugging Face download)
 }

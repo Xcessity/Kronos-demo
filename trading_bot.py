@@ -180,7 +180,7 @@ def main(model):
 
         try:
             # Check for expired positions after sleeping (handles connection loss / long sleep)
-            manager.check_expired(datetime.now(timezone.utc))
+            manager.check_expired(last_candle_time)
 
             df = wait_for_new_candle(client, Config['PREDICTION_SYMBOL'], Config['TIMEFRAME'], Config['HIST_POINTS'], last_candle_time)
             last_candle_time = df["timestamps"].iloc[-1]
