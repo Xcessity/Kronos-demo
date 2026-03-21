@@ -11,28 +11,44 @@ from binance.client import Client
 
 from model import KronosTokenizer, Kronos, KronosPredictor
 
+PretrainedModelName = "2026-03-20_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB360_PRED12"
+ExperimentSuffix = "_LB512"
+
 # --- Configuration ---
 Config = {
     "REPO_PATH": Path(__file__).parent.resolve(),
-    "TOKENIZER": "NeoQuasar/Kronos-Tokenizer-2k",
-    "MODEL": "NeoQuasar/Kronos-mini",
-    "MODEL_PATH": "../Kronos_model",
-    "HIST_POINTS": 360,
+    "USE_LOCAL_MODEL": True, # if True, load from LOCAL_*_PATH; if False, download from HuggingFace
+    "HF_TOKENIZER": "NeoQuasar/Kronos-Tokenizer-2k", # HuggingFace tokenizer name (if not using local paths)
+    "HF_MODEL": "NeoQuasar/Kronos-mini",   # HuggingFace model name (if not using local paths)
+    "HF_CACHE_DIR": "../Kronos_model", # local cache dir for HuggingFace models (if not using local paths)
+    
+    
+    "LOCAL_TOKENIZER_PATH": "../Kronos/finetune_csv/finetuned/" + PretrainedModelName + "/tokenizer/best_model",
+    "LOCAL_MODEL_PATH": "../Kronos/finetune_csv/finetuned/" + PretrainedModelName + "/basemodel/best_model",
+
+    "HIST_POINTS": 512,
     "MAX_CONTEXT": 2048, # 512 for SMALL and BASE, 2048 for MINI
     "PRED_HORIZON": 12, # hours ahead to predict (set to 1 for next hour)
     "N_PREDICTIONS": 100,
     "TOP_P": 0.95,
     "CANDLE_CSV": "D:/Projects/Cryptobot/Kronos/data/BTCUSDT_1h_20210101_to_20251201_test.csv",
-    "RESULTS_DIR": "experiments/2026-03-20_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB360_PRED12",
+    "RESULTS_DIR": "experiments/" + PretrainedModelName + ExperimentSuffix,
     "RESULTS_CSV": "evaluation_results.csv",
-    "USE_LOCAL_MODEL_ONLY": True # if True, only load model from local MODEL_PATH (no Hugging Face download)
 }
 
 
 def load_model():
     print("Loading Kronos model...")
-    tokenizer = KronosTokenizer.from_pretrained(Config["TOKENIZER"], cache_dir=Config["MODEL_PATH"], local_files_only=Config["USE_LOCAL_MODEL_ONLY"])
-    model = Kronos.from_pretrained(Config["MODEL"], cache_dir=Config["MODEL_PATH"], local_files_only=Config["USE_LOCAL_MODEL_ONLY"])
+    if Config["USE_LOCAL_MODEL"]:
+        print(f"  Tokenizer: {Config['LOCAL_TOKENIZER_PATH']}")
+        print(f"  Model:     {Config['LOCAL_MODEL_PATH']}")
+        tokenizer = KronosTokenizer.from_pretrained(Config["LOCAL_TOKENIZER_PATH"])
+        model = Kronos.from_pretrained(Config["LOCAL_MODEL_PATH"])
+    else:
+        print(f"  Tokenizer: {Config['HF_TOKENIZER']} (cache: {Config['HF_CACHE_DIR']})")
+        print(f"  Model:     {Config['HF_MODEL']} (cache: {Config['HF_CACHE_DIR']})")
+        tokenizer = KronosTokenizer.from_pretrained(Config["HF_TOKENIZER"], cache_dir=Config["HF_CACHE_DIR"])
+        model = Kronos.from_pretrained(Config["HF_MODEL"], cache_dir=Config["HF_CACHE_DIR"])
     tokenizer.eval()
     model.eval()
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -135,7 +151,7 @@ def run_evaluation(candles_df, predictor):
 
 
 if __name__ == "__main__":
-    model_path = Path(Config["MODEL_PATH"])
+    model_path = Path(Config["HF_CACHE_DIR"])
     model_path.mkdir(parents=True, exist_ok=True)
 
     candles = load_candles()
