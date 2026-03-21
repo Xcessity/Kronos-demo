@@ -11,20 +11,20 @@ from binance.client import Client
 
 from model import KronosTokenizer, Kronos, KronosPredictor
 
-PretrainedModelName = "2026-03-20_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB360_PRED12"
+LocalModelName = "2026-03-20_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB360_PRED12"
 ExperimentSuffix = "_LB512"
 
 # --- Configuration ---
 Config = {
     "REPO_PATH": Path(__file__).parent.resolve(),
+    
     "USE_LOCAL_MODEL": True, # if True, load from LOCAL_*_PATH; if False, download from HuggingFace
+    "LOCAL_TOKENIZER_PATH": "../Kronos/finetune_csv/finetuned/" + LocalModelName + "/tokenizer/best_model",
+    "LOCAL_MODEL_PATH": "../Kronos/finetune_csv/finetuned/" + LocalModelName + "/basemodel/best_model",
+
     "HF_TOKENIZER": "NeoQuasar/Kronos-Tokenizer-2k", # HuggingFace tokenizer name (if not using local paths)
     "HF_MODEL": "NeoQuasar/Kronos-mini",   # HuggingFace model name (if not using local paths)
     "HF_CACHE_DIR": "../Kronos_model", # local cache dir for HuggingFace models (if not using local paths)
-    
-    
-    "LOCAL_TOKENIZER_PATH": "../Kronos/finetune_csv/finetuned/" + PretrainedModelName + "/tokenizer/best_model",
-    "LOCAL_MODEL_PATH": "../Kronos/finetune_csv/finetuned/" + PretrainedModelName + "/basemodel/best_model",
 
     "HIST_POINTS": 512,
     "MAX_CONTEXT": 2048, # 512 for SMALL and BASE, 2048 for MINI
@@ -32,7 +32,7 @@ Config = {
     "N_PREDICTIONS": 100,
     "TOP_P": 0.95,
     "CANDLE_CSV": "D:/Projects/Cryptobot/Kronos/data/BTCUSDT_1h_20210101_to_20251201_test.csv",
-    "RESULTS_DIR": "experiments/" + PretrainedModelName + ExperimentSuffix,
+    "RESULTS_DIR": "experiments/" + LocalModelName + ExperimentSuffix,
     "RESULTS_CSV": "evaluation_results.csv",
 }
 
@@ -73,6 +73,17 @@ def save_results(df):
     csv_path = results_dir / Config["RESULTS_CSV"]
     df.to_csv(csv_path, index=False)
     print(f"Saved {len(df)} evaluation results to {csv_path}")
+
+
+def save_parameters():
+    results_dir = Config["REPO_PATH"] / Config["RESULTS_DIR"]
+    results_dir.mkdir(parents=True, exist_ok=True)
+    txt_path = results_dir / "evaluation_parameters.txt"
+    with open(txt_path, "w") as f:
+        f.write(f"LocalModelName: {LocalModelName}\n")
+        for key, value in Config.items():
+            f.write(f"{key}: {value}\n")
+    print(f"Saved parameters to {txt_path}")
 
 
 def run_evaluation(candles_df, predictor):
@@ -151,9 +162,11 @@ def run_evaluation(candles_df, predictor):
 
 
 if __name__ == "__main__":
-    model_path = Path(Config["HF_CACHE_DIR"])
-    model_path.mkdir(parents=True, exist_ok=True)
+    if not Config["USE_LOCAL_MODEL"]:
+        model_path = Path(Config["HF_CACHE_DIR"])
+        model_path.mkdir(parents=True, exist_ok=True)
 
+    save_parameters()
     candles = load_candles()
     predictor = load_model()
     results = run_evaluation(candles, predictor)
