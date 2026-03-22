@@ -7,9 +7,9 @@ import pandas as pd
 from dotenv import load_dotenv
 from binance.client import Client
 from model import KronosTokenizer, Kronos, KronosPredictor
-from binance_broker import binance_broker
-from trade_manager import TradeManager
-from bookkeeper import Bookkeeper
+from .binance_broker import binance_broker
+from .trade_manager import TradeManager
+from .bookkeeper import Bookkeeper
 
 # --- Configuration ---
 Config = {
@@ -32,8 +32,8 @@ Config = {
     "MAX_PRICE_STD_PCT": 1.05, # maximum predicted price change std percentage to consider for trading
     "LEVERAGE": 1,
     "STOP_LOSS_PCT": 0,
-    "STATE_FILE": "trade_state.json",
-    "TRADE_LOG": "trade_log.csv",
+    "STATE_FILE": "trading_bot/trade_state.json",
+    "TRADE_LOG": "trading_bot/trade_log.csv",
     "INITIAL_BALANCE": 1000.0,
 }
 
