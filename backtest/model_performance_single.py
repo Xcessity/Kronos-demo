@@ -1,19 +1,22 @@
+import shutil
+from datetime import datetime
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from pathlib import Path
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-10_SMALL_VANILLA_UPSIDE_BTCUSDT_1h_LB512_PRED6_NPRED100_TOPP09",
-    "PRED_HORIZON": 6,
-    "MIN_CHANGE_PCT": 0.0,
-    "MAX_STD_PCT": 0.45,
+    "EXPERIMENT_NAME": "2026-03-15_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB512_PRED12",
+    "PRED_HORIZON": 7,
+    "MIN_CHANGE_PCT": 0.95,
+    "MAX_STD_PCT": 1.65,
 
     "REPO_PATH": Path(__file__).resolve().parent.parent,
-    "EXPERIMENTS_DIR": "experiments",
+    "EXPERIMENTS_DIR": "backtest/results",
     "RESULTS_CSV": "evaluation_results.csv",
     "EQUITY_CHART": "equity_chart.png",
     "INITIAL_BALANCE": 1000.0,
@@ -26,7 +29,7 @@ def load_data():
     df = pd.read_csv(csv_path, parse_dates=["timestamp"])
     df.sort_values("timestamp", inplace=True)
     df.reset_index(drop=True, inplace=True)
-    return df
+    return df, results_dir
 
 
 def simulate(df):
@@ -226,7 +229,7 @@ def compute_metrics_compounding(trades):
     return metrics, equity
 
 
-def plot_equity(equity, equity_comp, trades):
+def plot_equity(equity, equity_comp, trades, run_dir: Path):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 5))
     bal = Config["INITIAL_BALANCE"]
     subtitle = f"Horizon h{Config['PRED_HORIZON']} | min_change={Config['MIN_CHANGE_PCT']}% | max_std={Config['MAX_STD_PCT']}%"
@@ -256,9 +259,7 @@ def plot_equity(equity, equity_comp, trades):
     ax2.grid(True, alpha=0.3)
 
     fig.tight_layout()
-    results_dir = Config["REPO_PATH"] / Config["EXPERIMENTS_DIR"] / Config["EXPERIMENT_NAME"]
-    results_dir.mkdir(parents=True, exist_ok=True)
-    chart_path = results_dir / Config["EQUITY_CHART"]
+    chart_path = run_dir / Config["EQUITY_CHART"]
     fig.savefig(chart_path, dpi=150)
     plt.close(fig)
     print(f"Equity chart saved to {chart_path.name}")
@@ -268,7 +269,12 @@ if __name__ == "__main__":
     print(f"Config: capital=${Config['INITIAL_BALANCE']}, horizon=h{Config['PRED_HORIZON']}, "
           f"min_change={Config['MIN_CHANGE_PCT']}%, max_std={Config['MAX_STD_PCT']}%\n")
 
-    df = load_data()
+    df, results_dir = load_data()
+
+    run_dir = results_dir / datetime.now().strftime("performance_%Y%m%d_%H%M%S")
+    run_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(__file__, run_dir / "model_performance_single.py")
+    print(f"Run output dir: {run_dir}")
 
     trades = simulate(df)
     print(f"Trades taken: {len(trades)}")
@@ -293,4 +299,4 @@ if __name__ == "__main__":
         for k, v in metrics_comp.items():
             print(f"  {k:20s}: {v}")
 
-        plot_equity(equity, equity_comp, trades)
+        plot_equity(equity, equity_comp, trades, run_dir)

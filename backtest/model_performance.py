@@ -49,7 +49,7 @@ def load_data():
         (re.match(r"close_mean_h(\d+)", c) for c in df.columns) if m
     )
     print(f"Loaded {len(df)} rows from {csv_path.name} covering {eval_days} days, {len(horizons)} horizons")
-    return df, eval_days, horizons
+    return df, eval_days, horizons, results_dir
 
 
 def compute_trades(df, horizon, min_change_pct=0.0, max_std_pct=None, min_upside_prob=None):
@@ -354,17 +354,12 @@ def plot_equity_charts(df, optimized_df, run_dir: Path):
 
 
 if __name__ == "__main__":
-    run_dir = (
-        Config["REPO_PATH"]
-        / "performance_runs"
-        / Config["EXPERIMENT_NAME"]
-        / datetime.now().strftime("%Y%m%d_%H%M%S")
-    )
+    df, eval_days, horizons, results_dir = load_data()
+
+    run_dir = results_dir / datetime.now().strftime("performance_%Y%m%d_%H%M%S")
     run_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy(__file__, run_dir / "model_performance.py")
     print(f"Run output dir: {run_dir}")
-
-    df, eval_days, horizons = load_data()
 
     baseline_df = baseline_metrics(df, eval_days, horizons)
 
