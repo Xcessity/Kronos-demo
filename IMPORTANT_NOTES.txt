@@ -1,5 +1,0 @@
-
-
-2026/03/01:
-The current evaluations are based on a lookback window of 360. The trained and retrained models 
-are expecting a lookback window of 512.
