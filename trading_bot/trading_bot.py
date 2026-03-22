@@ -1,15 +1,20 @@
 import os
+import sys
 import time
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
+
+# Add repo root to path so we can find sibling packages (model/) when run as a script
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import torch
 import pandas as pd
 from dotenv import load_dotenv
 from binance.client import Client
 from model import KronosTokenizer, Kronos, KronosPredictor
-from .binance_broker import binance_broker
-from .trade_manager import TradeManager
-from .bookkeeper import Bookkeeper
+from trading_bot.binance_broker import binance_broker
+from trading_bot.trade_manager import TradeManager
+from trading_bot.bookkeeper import Bookkeeper
 
 # --- Configuration ---
 Config = {
