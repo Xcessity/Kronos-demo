@@ -1,8 +1,12 @@
 import gc
 import os
+import sys
 import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+
+# Add repo root to path so we can find the model package when run as a script
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import numpy as np
 import pandas as pd
@@ -11,12 +15,12 @@ from binance.client import Client
 
 from model import KronosTokenizer, Kronos, KronosPredictor
 
-LocalModelName = "2026-03-20_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB360_PRED12"
-ExperimentSuffix = "_LB512"
+LocalModelName = "2026-03-15_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB512_PRED12"
+ExperimentSuffix = "" # optional suffix for results directory (e.g. to differentiate multiple runs with the same model)
 
 # --- Configuration ---
 Config = {
-    "REPO_PATH": Path(__file__).parent.resolve(),
+    "REPO_PATH": Path(__file__).resolve().parent.parent,
     
     "USE_LOCAL_MODEL": True, # if True, load from LOCAL_*_PATH; if False, download from HuggingFace
     "LOCAL_TOKENIZER_PATH": "../Kronos/finetune_csv/finetuned/" + LocalModelName + "/tokenizer/best_model",
@@ -30,9 +34,9 @@ Config = {
     "MAX_CONTEXT": 2048, # 512 for SMALL and BASE, 2048 for MINI
     "PRED_HORIZON": 12, # hours ahead to predict (set to 1 for next hour)
     "N_PREDICTIONS": 100,
-    "TOP_P": 0.95,
-    "CANDLE_CSV": "D:/Projects/Cryptobot/Kronos/data/BTCUSDT_1h_20210101_to_20251201_test.csv",
-    "RESULTS_DIR": "experiments/" + LocalModelName + ExperimentSuffix,
+    "TOP_P": 1.0,
+    "CANDLE_CSV": "D:/Projects/Cryptobot/Kronos/data/BTCUSDT_1h_20251201_to_20260322.csv",
+    "RESULTS_DIR": "backtest/results/" + LocalModelName + ExperimentSuffix,
     "RESULTS_CSV": "evaluation_results.csv",
 }
 

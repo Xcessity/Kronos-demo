@@ -1,4 +1,5 @@
 import itertools
+import re
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -11,13 +12,12 @@ import matplotlib.pyplot as plt
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-20_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB360_PRED12",
-    "HORIZONS": list(range(1, 13)),
+    "EXPERIMENT_NAME": "2026-03-15_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB512_PRED12",
     "MIN_PROFIT_FACTOR": 1.1,
     "MIN_RETURN_DD_RATIO": 1.5,
 
-    "REPO_PATH": Path(__file__).parent.resolve(),
-    "EXPERIMENTS_DIR": "experiments",
+    "REPO_PATH": Path(__file__).resolve().parent.parent,
+    "EXPERIMENTS_DIR": "backtest/results/",
     "RESULTS_CSV": "evaluation_results.csv",
     "INITIAL_BALANCE": 1000.0,
     "TRADING_FEE_PCT": 0.05,  # fee per trade in %, applied on entry and exit (round-trip = 2x)
@@ -44,8 +44,12 @@ def load_data():
     csv_path = results_dir / Config["RESULTS_CSV"]
     df = pd.read_csv(csv_path, parse_dates=["timestamp"])
     eval_days = (df["timestamp"].max() - df["timestamp"].min()).days
-    print(f"Loaded {len(df)} rows from {csv_path.name} covering {eval_days} days")
-    return df, eval_days
+    horizons = sorted(
+        int(m.group(1)) for m in
+        (re.match(r"close_mean_h(\d+)", c) for c in df.columns) if m
+    )
+    print(f"Loaded {len(df)} rows from {csv_path.name} covering {eval_days} days, {len(horizons)} horizons")
+    return df, eval_days, horizons
 
 
 def compute_trades(df, horizon, min_change_pct=0.0, max_std_pct=None, min_upside_prob=None):
@@ -212,10 +216,10 @@ def build_equity_curve(trades_df, balance=Config["INITIAL_BALANCE"]):
     return balance + pnl_dollars.cumsum().values
 
 
-def baseline_metrics(df, eval_days):
+def baseline_metrics(df, eval_days, horizons):
     print("\n=== Baseline metrics (no threshold) ===")
     rows = []
-    for h in Config["HORIZONS"]:
+    for h in horizons:
         trades = compute_trades(df, h, min_change_pct=0.0)
         m = compute_metrics(trades)
         m["horizon"] = h
@@ -227,7 +231,7 @@ def baseline_metrics(df, eval_days):
     return pd.DataFrame(rows)
 
 
-def optimize_thresholds(df, eval_days):
+def optimize_thresholds(df, eval_days, horizons):
     criteria = Config["OPTIMIZATION_CRITERIA"]
 
     # Build sweep axes from enabled criteria
@@ -249,7 +253,7 @@ def optimize_thresholds(df, eval_days):
           f"{total_combos} combinations per horizon")
 
     best_rows = []
-    for h in Config["HORIZONS"]:
+    for h in horizons:
         best_pnl = -float("inf")
         best_params = {}
         best_metrics = None
@@ -360,9 +364,9 @@ if __name__ == "__main__":
     shutil.copy(__file__, run_dir / "model_performance.py")
     print(f"Run output dir: {run_dir}")
 
-    df, eval_days = load_data()
+    df, eval_days, horizons = load_data()
 
-    baseline_df = baseline_metrics(df, eval_days)
+    baseline_df = baseline_metrics(df, eval_days, horizons)
 
     baseline_path = run_dir / "performance_baseline.csv"
     col_order = ["horizon", "eval_days", "num_trades", "win_rate", "profit_factor", "max_drawdown",
@@ -371,7 +375,7 @@ if __name__ == "__main__":
     baseline_df[col_order].to_csv(baseline_path, index=False)
     print(f"\nSaved baseline metrics to {baseline_path.name}")
 
-    optimized_df = optimize_thresholds(df, eval_days)
+    optimized_df = optimize_thresholds(df, eval_days, horizons)
     opt_path = run_dir / "performance_optimized.csv"
     if optimized_df.empty:
         print("\nNo horizons passed the profit_factor / return_dd_ratio filters.")

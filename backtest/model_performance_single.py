@@ -12,7 +12,7 @@ Config = {
     "MIN_CHANGE_PCT": 0.0,
     "MAX_STD_PCT": 0.45,
 
-    "REPO_PATH": Path(__file__).parent.resolve(),
+    "REPO_PATH": Path(__file__).resolve().parent.parent,
     "EXPERIMENTS_DIR": "experiments",
     "RESULTS_CSV": "evaluation_results.csv",
     "EQUITY_CHART": "equity_chart.png",
