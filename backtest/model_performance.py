@@ -6,6 +6,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+from strategy_score import StrategyScore
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -15,6 +17,7 @@ Config = {
     "EXPERIMENT_NAME": "2026-03-15_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB512_PRED12",
     "MIN_PROFIT_FACTOR": 1.1,
     "MIN_RETURN_DD_RATIO": 1.5,
+    "MIN_NR_TRADES_PER_MONTH": 10,
 
     "REPO_PATH": Path(__file__).resolve().parent.parent,
     "EXPERIMENTS_DIR": "backtest/results/",
@@ -252,11 +255,10 @@ def optimize_thresholds(df, eval_days, horizons):
     print(f"    Search space: {' x '.join(str(len(v)) for v in axis_values)} = "
           f"{total_combos} combinations per horizon")
 
+    scorer = StrategyScore()
     best_rows = []
     for h in horizons:
-        best_pnl = -float("inf")
-        best_params = {}
-        best_metrics = None
+        candidates = []
 
         for combo in itertools.product(*axis_values):
             params = dict(zip(axis_names, combo))
@@ -270,30 +272,37 @@ def optimize_thresholds(df, eval_days, horizons):
             trades = compute_trades(df, h, **kwargs)
             m = compute_metrics(trades)
 
+            trades_per_month = m["num_trades"] / max(eval_days, 1) * 31
             if (m["profit_factor"] >= Config["MIN_PROFIT_FACTOR"]
                     and m["return_dd_ratio"] >= Config["MIN_RETURN_DD_RATIO"]
-                    and m["total_pnl"] > best_pnl):
-                best_pnl = m["total_pnl"]
-                best_params = params
-                best_metrics = m
+                    and trades_per_month >= Config["MIN_NR_TRADES_PER_MONTH"]):
+                m["trades_per_month"] = round(trades_per_month, 1)
+                m["horizon"] = h
+                m["eval_days"] = eval_days
+                for name, val in params.items():
+                    m[f"best_{name}"] = val
+                candidates.append(m)
 
-        if best_metrics is None:
-            print(f"  h{h:>2}: no combination with profit_factor >= {Config['MIN_PROFIT_FACTOR']} "
-                  f"and return_dd_ratio >= {Config['MIN_RETURN_DD_RATIO']}")
+        if not candidates:
+            print(f"  h{h:>2}: no combination passed filters (pf>={Config['MIN_PROFIT_FACTOR']}, "
+                  f"ret/dd>={Config['MIN_RETURN_DD_RATIO']}, "
+                  f"trades/mo>={Config['MIN_NR_TRADES_PER_MONTH']})")
             continue
 
-        best_metrics["horizon"] = h
-        best_metrics["eval_days"] = eval_days
-        for name, val in best_params.items():
-            best_metrics[f"best_{name}"] = val
-        best_rows.append(best_metrics)
+        ranked = scorer.rank(candidates)
+        top = ranked[:10]
+        for rank_idx, entry in enumerate(top, 1):
+            entry["rank"] = rank_idx
+        best_rows.extend(top)
 
-        param_str = "  ".join(f"{k}={v:.4f}" for k, v in best_params.items())
-        print(f"  h{h:>2}: {param_str}  "
-              f"trades={best_metrics['num_trades']:>5}  pnl=${best_metrics['total_pnl']:>9.2f}  "
-              f"win_rate={best_metrics['win_rate']:.4f}  pf={best_metrics['profit_factor']:>7.4f}  "
-              f"sharpe={best_metrics['sharpe_ratio']:>7.4f}  "
-              f"ret/dd={best_metrics['return_dd_ratio']:>7.4f}")
+        print(f"  h{h:>2}: {len(candidates)} strategies passed filters, top 10:")
+        for entry in top:
+            param_parts = [f"{c[5:]}={entry[c]:.4f}" for c in entry if c.startswith("best_")]
+            param_str = "  ".join(param_parts)
+            print(f"    #{entry['rank']:>2}  fitness={entry['fitness_score']:.4f}  {param_str}  "
+                  f"trades={entry['num_trades']:>5}  pnl=${entry['total_pnl']:>9.2f}  "
+                  f"pf={entry['profit_factor']:>7.4f}  sharpe={entry['sharpe_ratio']:>7.4f}  "
+                  f"ret/dd={entry['return_dd_ratio']:>7.4f}")
 
     return pd.DataFrame(best_rows)
 
@@ -303,6 +312,8 @@ def plot_equity_charts(df, optimized_df, run_dir: Path):
     results_dir = run_dir
 
     for _, row in optimized_df.iterrows():
+        if row.get("rank", 1) != 1:
+            continue
         h = int(row["horizon"])
 
         # Build compute_trades kwargs from dynamic best_* columns
@@ -377,8 +388,8 @@ if __name__ == "__main__":
     else:
         # Build column order dynamically based on active criteria
         best_cols = [c for c in optimized_df.columns if c.startswith("best_")]
-        opt_order = ["horizon", "eval_days"] + best_cols + [
-            "num_trades", "win_rate", "profit_factor", "max_drawdown",
+        opt_order = ["horizon", "rank", "fitness_score", "eval_days"] + best_cols + [
+            "num_trades", "trades_per_month", "win_rate", "profit_factor", "max_drawdown",
             "return_dd_ratio", "sharpe_ratio", "final_equity", "total_pnl",
             "gross_profit", "gross_loss"]
         optimized_df[opt_order].to_csv(opt_path, index=False)

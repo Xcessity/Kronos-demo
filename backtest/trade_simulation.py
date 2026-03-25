@@ -25,8 +25,8 @@ Config = {
     "INITIAL_BALANCE": 1000.0,
     "FEE_PCT": 0.1,  # round-trip fee in %
 
-    "SL_FACTOR_RANGE": [0.3, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
-    "TP_FACTOR_RANGE": [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0],
+    "SL_PCT_RANGE": [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0],
+    "TP_PCT_RANGE": [0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0],
 }
 
 
@@ -179,16 +179,14 @@ def generate_signals(df, horizon):
 # Part 3: Trade Simulation with SL/TP on 1m Candles
 # ═══════════════════════════════════════════════════════════════════
 
-def run_1m_trade(candles_1m, entry_ts, entry_price, direction, predicted_change_pct,
-                 sl_factor, tp_factor, horizon_minutes):
-    predicted_move = abs(predicted_change_pct) / 100.0 * entry_price
-
+def run_1m_trade(candles_1m, entry_ts, entry_price, direction,
+                 sl_pct, tp_pct, horizon_minutes):
     if direction == 1:  # LONG
-        sl_price = entry_price - sl_factor * predicted_move
-        tp_price = entry_price + tp_factor * predicted_move
+        sl_price = entry_price * (1 - sl_pct / 100.0)
+        tp_price = entry_price * (1 + tp_pct / 100.0)
     else:  # SHORT
-        sl_price = entry_price + sl_factor * predicted_move
-        tp_price = entry_price - tp_factor * predicted_move
+        sl_price = entry_price * (1 + sl_pct / 100.0)
+        tp_price = entry_price * (1 - tp_pct / 100.0)
 
     # trade starts after hourly candle closes; full horizon from trade start
     trade_start_ts = entry_ts + timedelta(hours=1)
@@ -250,7 +248,7 @@ def run_1m_trade(candles_1m, entry_ts, entry_price, direction, predicted_change_
     }
 
 
-def simulate_trades(eval_df, candles_1m, horizon, sl_factor, tp_factor):
+def simulate_trades(eval_df, candles_1m, horizon, sl_pct, tp_pct):
     signals = generate_signals(eval_df, horizon)
     horizon_minutes = horizon * 60
     trades = []
@@ -273,8 +271,8 @@ def simulate_trades(eval_df, candles_1m, horizon, sl_factor, tp_factor):
                 new_horizon_end = current_ts + timedelta(minutes=horizon_minutes)
                 result = run_1m_trade(
                     candles_1m, position["entry_ts"], position["entry_price"],
-                    position["direction"], signal["predicted_change_pct"],
-                    sl_factor, tp_factor, int((new_horizon_end - position["entry_ts"]).total_seconds() / 60),
+                    position["direction"],
+                    sl_pct, tp_pct, int((new_horizon_end - position["entry_ts"]).total_seconds() / 60),
                 )
                 if result is not None:
                     result["timestamp"] = position["entry_ts"]
@@ -312,8 +310,8 @@ def simulate_trades(eval_df, candles_1m, horizon, sl_factor, tp_factor):
         if position is None and signal is not None:
             result = run_1m_trade(
                 candles_1m, signal["timestamp"], signal["entry_price"],
-                signal["direction"], signal["predicted_change_pct"],
-                sl_factor, tp_factor, horizon_minutes,
+                signal["direction"],
+                sl_pct, tp_pct, horizon_minutes,
             )
             if result is not None:
                 result["timestamp"] = signal["timestamp"]
@@ -416,8 +414,8 @@ def build_equity_curve(trades_df, balance=None):
 # ═══════════════════════════════════════════════════════════════════
 
 def optimize_sl_tp(eval_df, candles_1m, horizon):
-    sl_range = Config["SL_FACTOR_RANGE"]
-    tp_range = Config["TP_FACTOR_RANGE"]
+    sl_range = Config["SL_PCT_RANGE"]
+    tp_range = Config["TP_PCT_RANGE"]
     total = len(sl_range) * len(tp_range)
 
     print(f"\n=== Grid search: {len(sl_range)} SL x {len(tp_range)} TP = {total} combos ===")
@@ -426,22 +424,22 @@ def optimize_sl_tp(eval_df, candles_1m, horizon):
     best_pnl = -float("inf")
     best_params = None
 
-    for sl_f, tp_f in itertools.product(sl_range, tp_range):
-        trades_df = simulate_trades(eval_df, candles_1m, horizon, sl_f, tp_f)
+    for sl_pct, tp_pct in itertools.product(sl_range, tp_range):
+        trades_df = simulate_trades(eval_df, candles_1m, horizon, sl_pct, tp_pct)
         m = compute_metrics(trades_df)
-        m["sl_factor"] = sl_f
-        m["tp_factor"] = tp_f
+        m["sl_pct"] = sl_pct
+        m["tp_pct"] = tp_pct
         rows.append(m)
 
         if m["total_pnl"] > best_pnl and m["num_trades"] > 0:
             best_pnl = m["total_pnl"]
-            best_params = (sl_f, tp_f)
+            best_params = (sl_pct, tp_pct)
 
     results_df = pd.DataFrame(rows)
     results_df.sort_values("total_pnl", ascending=False, inplace=True)
 
     if best_params:
-        print(f"\nBest: SL={best_params[0]}, TP={best_params[1]}, PnL=${best_pnl:.2f}")
+        print(f"\nBest: SL={best_params[0]}%, TP={best_params[1]}%, PnL=${best_pnl:.2f}")
     else:
         print("\nNo profitable combination found.")
 
@@ -478,7 +476,7 @@ def plot_equity(trades_df, sl_f, tp_f, metrics, run_dir):
 
     fig.suptitle(Config["EXPERIMENT_NAME"], fontsize=13, fontweight="bold")
     ax.set_title(
-        f"1m Trade Sim  h{h}  |  SL={sl_f}x  TP={tp_f}x  |  "
+        f"1m Trade Sim  h{h}  |  SL={sl_f}%  TP={tp_f}%  |  "
         f"PnL=${metrics['total_pnl']:.2f}  |  Win={metrics['win_rate']:.1%}  |  "
         f"Sharpe={metrics['sharpe_ratio']:.2f}  |  PF={metrics['profit_factor']:.2f}  |  "
         f"Ret/DD={metrics['return_dd_ratio']:.2f}  |  "
@@ -536,11 +534,11 @@ if __name__ == "__main__":
     # 5. Print top 10
     print("\n=== Top 10 combinations by PnL ===")
     top10 = grid_df.head(10)
-    print(f"{'SL':>5}  {'TP':>5}  {'Trades':>6}  {'Win%':>6}  {'PnL$':>9}  "
+    print(f"{'SL%':>5}  {'TP%':>5}  {'Trades':>6}  {'Win%':>6}  {'PnL$':>9}  "
           f"{'Sharpe':>7}  {'PF':>7}  {'Ret/DD':>7}  {'SL%':>5}  {'TP%':>5}  {'HZ%':>5}  {'AvgMin':>6}")
     print("-" * 95)
     for _, r in top10.iterrows():
-        print(f"{r['sl_factor']:5.2f}  {r['tp_factor']:5.2f}  {int(r['num_trades']):6d}  "
+        print(f"{r['sl_pct']:5.2f}  {r['tp_pct']:5.2f}  {int(r['num_trades']):6d}  "
               f"{r['win_rate']:5.1%}  {r['total_pnl']:9.2f}  "
               f"{r['sharpe_ratio']:7.4f}  {r['profit_factor']:7.4f}  {r['return_dd_ratio']:7.4f}  "
               f"{r['sl_rate']:4.0%}  {r['tp_rate']:4.0%}  {r['horizon_rate']:4.0%}  "
@@ -549,7 +547,7 @@ if __name__ == "__main__":
     # 6. Best result detail
     if best_params:
         sl_best, tp_best = best_params
-        print(f"\n=== Best trades (SL={sl_best}, TP={tp_best}) ===")
+        print(f"\n=== Best trades (SL={sl_best}%, TP={tp_best}%) ===")
         best_trades_df = simulate_trades(eval_df, candles_1m, h, sl_best, tp_best)
         best_metrics = compute_metrics(best_trades_df)
 
