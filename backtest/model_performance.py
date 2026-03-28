@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-15_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB512_PRED12",
+    "EXPERIMENT_NAME": "2026-03-27_MINI_BTCUSDT_2h_2022-01-01_2025-12-31_LB512_PRED8",
     "MIN_PROFIT_FACTOR": 1.1,
     "MIN_RETURN_DD_RATIO": 1.5,
     "MIN_NR_TRADES_PER_MONTH": 10,
@@ -116,7 +116,7 @@ def compute_trades(df, horizon, min_change_pct=0.0, max_std_pct=None, min_upside
         exit_price = prices[exit_idx]
         d = position["direction"]
         raw_pnl_pct = d * (exit_price - position["entry_price"]) / position["entry_price"] * 100.0
-        pnl_pct = raw_pnl_pct * leverage - 2 * fee_pct
+        pnl_pct = (raw_pnl_pct - 2 * fee_pct) * leverage
         trades.append({
             "entry": position["entry_price"],
             "exit": exit_price,
