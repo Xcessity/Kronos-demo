@@ -71,6 +71,17 @@ def load_candles():
     return None
 
 
+def infer_timeframe(df):
+    """Derive candle timeframe string (e.g. '15m', '1h', '2h') and delta from timestamp diffs."""
+    minutes = df["timestamps"].sort_values().diff().dt.total_seconds().median() / 60
+    for m, label in [(1, "1m"), (3, "3m"), (5, "5m"), (15, "15m"), (30, "30m"),
+                     (60, "1h"), (120, "2h"), (240, "4h"), (480, "8h"), (720, "12h"), (1440, "1d")]:
+        if abs(minutes - m) / m < 0.1:
+            return label, pd.Timedelta(minutes=m)
+    m_int = round(minutes)
+    return f"{m_int}m", pd.Timedelta(minutes=m_int)
+
+
 def save_results(df):
     results_dir = Config["REPO_PATH"] / Config["RESULTS_DIR"]
     results_dir.mkdir(parents=True, exist_ok=True)
@@ -90,8 +101,9 @@ def save_parameters():
     print(f"Saved parameters to {txt_path}")
 
 
-def run_evaluation(candles_df, predictor):
+def run_evaluation(candles_df, predictor, candle_tf):
     """For each eligible candle, generate PRED_HORIZON predictions (wide format: one row per candle)."""
+    tf_str, candle_delta = candle_tf
     hist_len = Config["HIST_POINTS"]
     pred_horizon = Config["PRED_HORIZON"]
     n_preds = Config["N_PREDICTIONS"]
@@ -113,8 +125,8 @@ def run_evaluation(candles_df, predictor):
         anchor_ts = candles_df["timestamps"].iloc[i]
 
         last_timestamp = context_df["timestamps"].max()
-        start_new = last_timestamp + pd.Timedelta(hours=1)
-        y_timestamps = pd.date_range(start=start_new, periods=pred_horizon, freq="h")
+        start_new = last_timestamp + candle_delta
+        y_timestamps = pd.date_range(start=start_new, periods=pred_horizon, freq=candle_delta)
         y_timestamp = pd.Series(y_timestamps, name="y_timestamp")
         x_timestamp = context_df["timestamps"]
         x_df = context_df[["open", "high", "low", "close", "volume", "amount"]]
@@ -139,16 +151,16 @@ def run_evaluation(candles_df, predictor):
         actual_close = close_lookup.get(anchor_ts)
         row = {"timestamp": anchor_ts, "actual_close": actual_close}
         for h in range(pred_horizon):
-            target_ts = anchor_ts + pd.Timedelta(hours=h + 1)
-            row[f"close_mean_h{h+1}"] = close_mean[h]
-            row[f"close_std_h{h+1}"] = close_std[h]
-            row[f"volume_mean_h{h+1}"] = volume_mean[h]
-            row[f"volume_std_h{h+1}"] = volume_std[h]
-            row[f"actual_close_h{h+1}"] = close_lookup.get(target_ts)
+            target_ts = anchor_ts + candle_delta * (h + 1)
+            row[f"close_mean_{tf_str}_h{h+1}"] = close_mean[h]
+            row[f"close_std_{tf_str}_h{h+1}"] = close_std[h]
+            row[f"volume_mean_{tf_str}_h{h+1}"] = volume_mean[h]
+            row[f"volume_std_{tf_str}_h{h+1}"] = volume_std[h]
+            row[f"actual_close_{tf_str}_h{h+1}"] = close_lookup.get(target_ts)
             if actual_close is not None:
-                row[f"upside_probability_h{h+1}"] = (close_preds.iloc[h] > actual_close).sum() / n_preds
+                row[f"upside_probability_{tf_str}_h{h+1}"] = (close_preds.iloc[h] > actual_close).sum() / n_preds
             else:
-                row[f"upside_probability_h{h+1}"] = None
+                row[f"upside_probability_{tf_str}_h{h+1}"] = None
         results_rows.append(row)
 
         print(f"{elapsed:.1f}s")
@@ -172,7 +184,9 @@ if __name__ == "__main__":
 
     save_parameters()
     candles = load_candles()
+    candle_tf = infer_timeframe(candles)
+    print(f"Inferred candle timeframe: {candle_tf[0]}")
     predictor = load_model()
-    results = run_evaluation(candles, predictor)
+    results = run_evaluation(candles, predictor, candle_tf)
 
     print(f"\nEvaluation complete. {len(results)} total result rows in {Config['RESULTS_CSV']}")

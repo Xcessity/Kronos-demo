@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from evaluation_csv import EvaluationResults
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -26,16 +27,19 @@ Config = {
 def load_data():
     results_dir = Config["REPO_PATH"] / Config["EXPERIMENTS_DIR"] / Config["EXPERIMENT_NAME"]
     csv_path = results_dir / Config["RESULTS_CSV"]
-    df = pd.read_csv(csv_path, parse_dates=["timestamp"])
+    df = EvaluationResults.load(csv_path)
     df.sort_values("timestamp", inplace=True)
     df.reset_index(drop=True, inplace=True)
     return df, results_dir
 
 
 def simulate(df):
+    import re
     h = Config["PRED_HORIZON"]
-    col_mean = f"close_mean_h{h}"
-    col_std = f"close_std_h{h}"
+    _m = re.search(r"close_mean_(\w+)_h\d+", " ".join(df.columns))
+    _tf = _m.group(1) if _m else "?"
+    col_mean = f"close_mean_{_tf}_h{h}"
+    col_std = f"close_std_{_tf}_h{h}"
 
     required = ["actual_close", col_mean, col_std]
     for c in required:

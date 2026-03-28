@@ -11,6 +11,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from binance.client import Client
+from evaluation_csv import EvaluationResults
 
 # --- Configuration ---
 Config = {
@@ -140,8 +141,10 @@ def load_or_update_cache(symbol, required_start, required_end):
 # ═══════════════════════════════════════════════════════════════════
 
 def generate_signals(df, horizon):
-    col_mean = f"close_mean_h{horizon}"
-    col_std = f"close_std_h{horizon}"
+    _m = re.search(r"close_mean_(\w+)_h\d+", " ".join(df.columns))
+    _tf = _m.group(1) if _m else "?"
+    col_mean = f"close_mean_{_tf}_h{horizon}"
+    col_std = f"close_std_{_tf}_h{horizon}"
     min_change = Config["MIN_CHANGE_PCT"]
     max_std = Config["MAX_STD_PCT"]
 
@@ -507,7 +510,7 @@ if __name__ == "__main__":
     # 1. Load evaluation data
     results_dir = Config["REPO_PATH"] / Config["EXPERIMENTS_DIR"] / Config["EXPERIMENT_NAME"]
     csv_path = results_dir / Config["RESULTS_CSV"]
-    eval_df = pd.read_csv(csv_path, parse_dates=["timestamp"])
+    eval_df = EvaluationResults.load(csv_path)
     eval_df.sort_values("timestamp", inplace=True)
     eval_df.reset_index(drop=True, inplace=True)
     print(f"Loaded {len(eval_df)} evaluation rows from {csv_path.name}")

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from evaluation_csv import EvaluationResults
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -42,20 +43,22 @@ Config = {
 def load_data():
     results_dir = Config["REPO_PATH"] / Config["EXPERIMENTS_DIR"] / Config["EXPERIMENT_NAME"]
     csv_path = results_dir / Config["RESULTS_CSV"]
-    df = pd.read_csv(csv_path, parse_dates=["timestamp"])
+    df = EvaluationResults.load(csv_path)
     eval_days = (df["timestamp"].max() - df["timestamp"].min()).days
-    horizons = sorted(
-        int(m.group(1)) for m in
-        (re.match(r"close_mean_h(\d+)", c) for c in df.columns) if m
-    )
+    _pat = re.compile(r"close_mean_(\w+)_h(\d+)")
+    _hits = [_pat.match(c) for c in df.columns]
+    _hits = [h for h in _hits if h]
+    horizons = sorted(int(h.group(2)) for h in _hits)
     print(f"Loaded {len(df)} rows from {csv_path.name} covering {eval_days} days, {len(horizons)} horizons")
     return df, eval_days, horizons, results_dir
 
 
 def compute_trades(df, horizon, min_change_pct=0.0, min_z=None, min_upside_prob=None):
-    col_pred = f"close_mean_h{horizon}"
-    col_std = f"close_std_h{horizon}"
-    col_upside = f"upside_probability_h{horizon}"
+    _m = re.search(r"close_mean_(\w+)_h\d+", " ".join(df.columns))
+    _tf = _m.group(1) if _m else "?"
+    col_pred = f"close_mean_{_tf}_h{horizon}"
+    col_std = f"close_std_{_tf}_h{horizon}"
+    col_upside = f"upside_probability_{_tf}_h{horizon}"
     col_entry = "actual_close"
 
     if min_upside_prob is not None and col_upside not in df.columns:
