@@ -16,7 +16,7 @@ from binance.client import Client
 from model import KronosTokenizer, Kronos, KronosPredictor
 
 LocalModelName = "2026-03-28_MINI_BTCUSDT_2h_2022-01-01_2025-12-31_LB512_PRED10"
-ExperimentSuffix = "" # optional suffix for results directory (e.g. to differentiate multiple runs with the same model)
+ExperimentSuffix = "_MORE_EVAL_DATA" # optional suffix for results directory (e.g. to differentiate multiple runs with the same model)
 
 # --- Configuration ---
 Config = {
@@ -35,7 +35,7 @@ Config = {
     "PRED_HORIZON": 10, # hours ahead to predict (set to 1 for next hour)
     "N_PREDICTIONS": 100,
     "TOP_P": 1.0,
-    "CANDLE_CSV": "D:/Projects/Cryptobot/Kronos/data/BTCUSDT_2h_20251231_to_20260327.csv",
+    "CANDLE_CSV": "D:/Projects/Cryptobot/Kronos/data/BTCUSDT_2h_20251116_to_20260331.csv",
     "RESULTS_DIR": "backtest/results/" + LocalModelName + ExperimentSuffix,
     "RESULTS_CSV": "evaluation_results.csv",
 }

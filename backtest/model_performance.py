@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-28_MINI_BTCUSDT_2h_2022-01-01_2025-12-31_LB512_PRED10",
+    "EXPERIMENT_NAME": "2026-03-28_MINI_BTCUSDT_2h_2022-01-01_2025-12-31_LB512_PRED10_MORE_EVAL_DATA",
     "MIN_PROFIT_FACTOR": 1.1,
     "MIN_RETURN_DD_RATIO": 1.5,
     "MIN_NR_TRADES_PER_MONTH": 10,
@@ -33,7 +33,7 @@ Config = {
         },
         "close_mean": {
             "enabled": True,
-            "range": np.arange(0.0, 1.05, 0.05),
+            "range": np.arange(0.0, 2.05, 0.1),
         },
         "upside_probability": {
             "enabled": False,

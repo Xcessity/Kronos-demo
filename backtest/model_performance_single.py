@@ -11,10 +11,10 @@ import matplotlib.pyplot as plt
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-15_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB512_PRED12",
+    "EXPERIMENT_NAME": "2026-03-28_MINI_BTCUSDT_2h_2022-01-01_2025-12-31_LB512_PRED10",
     "PRED_HORIZON": 7,
-    "MIN_CHANGE_PCT": 0.95,
-    "MAX_STD_PCT": 1.65,
+    "MIN_CHANGE_PCT": 0.35,
+    "MAX_STD_PCT": 0.95,
 
     "REPO_PATH": Path(__file__).resolve().parent.parent,
     "EXPERIMENTS_DIR": "backtest/results",
