@@ -15,15 +15,16 @@ from binance.client import Client
 
 from model import KronosTokenizer, Kronos, KronosPredictor
 
-LocalModelName = "2026-03-28_MINI_BTCUSDT_2h_2022-01-01_2025-12-31_LB512_PRED10"
-ExperimentSuffix = "_MORE_EVAL_DATA" # optional suffix for results directory (e.g. to differentiate multiple runs with the same model)
+LocalTokenizerName = "2026-03-31_MINI_BTCUSDT_1h_2021-01-01_2026-03-31_LB512_PRED12_P1" # for tokenizer path (can be different from model if you want)
+LocalModelName = "2026-03-31_MINI_BTCUSDT_1h_2024-01-01_2026-01-14_LB512_PRED12_P2"
+ExperimentSuffix = "" # optional suffix for results directory (e.g. to differentiate multiple runs with the same model)
 
 # --- Configuration ---
 Config = {
     "REPO_PATH": Path(__file__).resolve().parent.parent,
     
     "USE_LOCAL_MODEL": True, # if True, load from LOCAL_*_PATH; if False, download from HuggingFace
-    "LOCAL_TOKENIZER_PATH": "../Kronos/finetune_csv/finetuned/" + LocalModelName + "/tokenizer/best_model",
+    "LOCAL_TOKENIZER_PATH": "../Kronos/finetune_csv/finetuned/" + LocalTokenizerName + "/tokenizer/best_model",
     "LOCAL_MODEL_PATH": "../Kronos/finetune_csv/finetuned/" + LocalModelName + "/basemodel/best_model",
 
     "HF_TOKENIZER": "NeoQuasar/Kronos-Tokenizer-2k", # HuggingFace tokenizer name (if not using local paths)
@@ -31,11 +32,11 @@ Config = {
     "HF_CACHE_DIR": "../Kronos_model", # local cache dir for HuggingFace models (if not using local paths)
 
     "HIST_POINTS": 512, # number of historical candles to provide as context (must be <= MAX_CONTEXT)
-    "MAX_CONTEXT": 2048, # 512 for SMALL and BASE, 2048 for MINI
-    "PRED_HORIZON": 10, # hours ahead to predict (set to 1 for next hour)
+    "MAX_CONTEXT": 1024, # double the HIST_POINTS to allow room for predictions in the context window (must be <= model's max context length)
+    "PRED_HORIZON": 12, # hours ahead to predict (set to 1 for next hour)
     "N_PREDICTIONS": 100,
     "TOP_P": 1.0,
-    "CANDLE_CSV": "D:/Projects/Cryptobot/Kronos/data/BTCUSDT_2h_20251116_to_20260331.csv",
+    "CANDLE_CSV": "D:/Projects/Cryptobot/Kronos/data/BTCUSDT_1h_20260114_to_20260401.csv",
     "RESULTS_DIR": "backtest/results/" + LocalModelName + ExperimentSuffix,
     "RESULTS_CSV": "evaluation_results.csv",
 }
