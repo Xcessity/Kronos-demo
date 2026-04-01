@@ -23,10 +23,10 @@ from trade_simulation import (
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-27_MINI_BTCUSDT_2h_2022-01-01_2025-12-31_LB512_PRED8",
+    "EXPERIMENT_NAME": "2026-03-31_MINI_BTCUSDT_1h_2024-01-01_2026-01-14_LB512_PRED12_P2",
     "PRED_HORIZON": 8, # horizon counter, not actual time units (depends on data frequency)!!!
-    "MIN_CHANGE_PCT": 0.8,
-    "MAX_STD_PCT": 1.6,
+    "MIN_CHANGE_PCT": 1.2,
+    "MAX_STD_PCT": 2.0,
 
     "REPO_PATH": Path(__file__).resolve().parent.parent,
     "EXPERIMENTS_DIR": "backtest/results",

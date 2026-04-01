@@ -15,10 +15,10 @@ from evaluation_csv import EvaluationResults
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-15_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB512_PRED12",
-    "PRED_HORIZON": 7,
-    "MIN_CHANGE_PCT": 0.95,
-    "MAX_STD_PCT": 1.65,
+    "EXPERIMENT_NAME": "2026-03-31_MINI_BTCUSDT_1h_2024-01-01_2026-01-14_LB512_PRED12_P2",
+    "PRED_HORIZON": 12,
+    "MIN_CHANGE_PCT": 1.2,
+    "MAX_STD_PCT": 2.0,
 
     "REPO_PATH": Path(__file__).resolve().parent.parent,
     "EXPERIMENTS_DIR": "backtest/results",
@@ -26,8 +26,8 @@ Config = {
     "INITIAL_BALANCE": 1000.0,
     "FEE_PCT": 0.1,  # round-trip fee in %
 
-    "SL_PCT_RANGE": [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0],
-    "TP_PCT_RANGE": [0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0],
+    "SL_PCT_RANGE": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.5, 3.0],
+    "TP_PCT_RANGE": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.5, 3.0],
 }
 
 
