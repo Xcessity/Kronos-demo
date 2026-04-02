@@ -405,7 +405,7 @@ if __name__ == "__main__":
         opt_order = ["horizon", "rank", "fitness_score", "eval_days"] + best_cols + [
             "num_trades", "trades_per_month", "win_rate", "profit_factor", "max_drawdown",
             "return_dd_ratio", "sharpe_ratio", "final_equity", "total_pnl",
-            "gross_profit", "gross_loss"]
+            "gross_profit", "gross_loss", "pnl_per_hour"]
         optimized_df[opt_order].to_csv(opt_path, index=False)
         print(f"Saved optimized metrics to {opt_path.name}")
         plot_equity_charts(df, optimized_df, run_dir)
