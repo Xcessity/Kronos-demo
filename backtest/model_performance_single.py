@@ -12,9 +12,9 @@ import matplotlib.pyplot as plt
 # --- Configuration ---
 Config = {
     "EXPERIMENT_NAME": "2026-03-31_MINI_BTCUSDT_1h_2024-01-01_2026-01-14_LB512_PRED12_P2",
-    "PRED_HORIZON": 8,
-    "MIN_CHANGE_PCT": 1.2,
-    "MAX_STD_PCT": 2.0,
+    "PRED_HORIZON": 5,
+    "MIN_CHANGE_PCT": 1.3,
+    "MAX_STD_PCT": 1.80,
 
     "REPO_PATH": Path(__file__).resolve().parent.parent,
     "EXPERIMENTS_DIR": "backtest/results",

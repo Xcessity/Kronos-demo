@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-31_MINI_BTCUSDT_1h_2024-01-01_2026-01-14_LB512_PRED12_P2",
+    "EXPERIMENT_NAME": "2026-03-31_MINI_BTCUSDT_1h_2024-01-01_2026-01-14_LB512_PRED12_P2_LONG_TEST_PER",
     "MIN_PROFIT_FACTOR": 1.1,
     "MIN_RETURN_DD_RATIO": 1.5,
     "MIN_NR_TRADES_PER_MONTH": 10,
@@ -115,7 +115,7 @@ def compute_trades(df, horizon, min_change_pct=0.0, max_std_pct=None, min_upside
     leverage = Config["LEVERAGE"]
     fee_pct = Config["TRADING_FEE_PCT"]
 
-    def close_position(exit_idx):
+    def close_position(exit_idx, entry_idx):
         exit_price = prices[exit_idx]
         d = position["direction"]
         raw_pnl_pct = d * (exit_price - position["entry_price"]) / position["entry_price"] * 100.0
@@ -125,6 +125,7 @@ def compute_trades(df, horizon, min_change_pct=0.0, max_std_pct=None, min_upside
             "exit": exit_price,
             "direction": d,
             "pnl_pct": pnl_pct,
+            "duration_bars": exit_idx - entry_idx,
         })
 
     for i in range(n):
@@ -137,7 +138,7 @@ def compute_trades(df, horizon, min_change_pct=0.0, max_std_pct=None, min_upside
                     position["close_idx"] = min(i + h, n - 1)
                 else:
                     # opposite direction: close current, open new
-                    close_position(i)
+                    close_position(i, position["entry_idx"])
                     position = {
                         "direction": signal,
                         "entry_idx": i,
@@ -146,7 +147,7 @@ def compute_trades(df, horizon, min_change_pct=0.0, max_std_pct=None, min_upside
                     }
             elif i >= position["close_idx"]:
                 # no signal and horizon reached: close naturally
-                close_position(position["close_idx"])
+                close_position(position["close_idx"], position["entry_idx"])
                 position = None
         else:
             if signal is not None:
@@ -159,21 +160,22 @@ def compute_trades(df, horizon, min_change_pct=0.0, max_std_pct=None, min_upside
 
     # close any remaining open position
     if position is not None:
-        close_position(min(position["close_idx"], n - 1))
+        close_position(min(position["close_idx"], n - 1), position["entry_idx"])
 
     if not trades:
-        return pd.DataFrame(columns=["entry", "exit", "direction", "pnl_pct"])
+        return pd.DataFrame(columns=["entry", "exit", "direction", "pnl_pct", "duration_bars"])
 
     return pd.DataFrame(trades)
 
 
-def compute_metrics(trades_df, balance=Config["INITIAL_BALANCE"]):
+def compute_metrics(trades_df, balance=Config["INITIAL_BALANCE"], minutes_per_bar=None):
     if len(trades_df) == 0:
         return {
             "num_trades": 0, "win_rate": 0.0, "total_pnl": 0.0,
             "final_equity": balance, "sharpe_ratio": 0.0,
             "return_dd_ratio": 0.0, "profit_factor": 0.0,
             "max_drawdown": 0.0, "gross_profit": 0.0, "gross_loss": 0.0,
+            "pnl_per_hour": 0.0,
         }
 
     position_size = balance
@@ -202,6 +204,12 @@ def compute_metrics(trades_df, balance=Config["INITIAL_BALANCE"]):
     else:
         sharpe_ratio = 0.0
 
+    if minutes_per_bar is not None and "duration_bars" in trades_df.columns:
+        exposure_hours = trades_df["duration_bars"].sum() * minutes_per_bar / 60.0
+        pnl_per_hour = round(total_pnl / exposure_hours, 4) if exposure_hours > 0 else 0.0
+    else:
+        pnl_per_hour = 0.0
+
     return {
         "num_trades": num_trades,
         "win_rate": round(win_rate, 4),
@@ -213,6 +221,7 @@ def compute_metrics(trades_df, balance=Config["INITIAL_BALANCE"]):
         "profit_factor": round(profit_factor, 4),
         "gross_profit": round(gross_profit, 2),
         "gross_loss": round(gross_loss, 2),
+        "pnl_per_hour": pnl_per_hour,
     }
 
 
@@ -224,10 +233,11 @@ def build_equity_curve(trades_df, balance=Config["INITIAL_BALANCE"]):
 
 def baseline_metrics(df, eval_days, horizons):
     print("\n=== Baseline metrics (no threshold) ===")
+    minutes_per_bar = (df["timestamp"].iloc[1] - df["timestamp"].iloc[0]).total_seconds() / 60
     rows = []
     for h in horizons:
         trades = compute_trades(df, h, min_change_pct=0.0)
-        m = compute_metrics(trades)
+        m = compute_metrics(trades, minutes_per_bar=minutes_per_bar)
         m["horizon"] = h
         m["eval_days"] = eval_days
         rows.append(m)
@@ -258,6 +268,7 @@ def optimize_thresholds(df, eval_days, horizons):
     print(f"    Search space: {' x '.join(str(len(v)) for v in axis_values)} = "
           f"{total_combos} combinations per horizon")
 
+    minutes_per_bar = (df["timestamp"].iloc[1] - df["timestamp"].iloc[0]).total_seconds() / 60
     scorer = StrategyScore()
     best_rows = []
     for h in horizons:
@@ -273,7 +284,7 @@ def optimize_thresholds(df, eval_days, horizons):
             }
 
             trades = compute_trades(df, h, **kwargs)
-            m = compute_metrics(trades)
+            m = compute_metrics(trades, minutes_per_bar=minutes_per_bar)
 
             trades_per_month = m["num_trades"] / max(eval_days, 1) * 31
             if (m["profit_factor"] >= Config["MIN_PROFIT_FACTOR"]
@@ -305,7 +316,7 @@ def optimize_thresholds(df, eval_days, horizons):
             print(f"    #{entry['rank']:>2}  fitness={entry['fitness_score']:.4f}  {param_str}  "
                   f"trades={entry['num_trades']:>5}  pnl=${entry['total_pnl']:>9.2f}  "
                   f"pf={entry['profit_factor']:>7.4f}  sharpe={entry['sharpe_ratio']:>7.4f}  "
-                  f"ret/dd={entry['return_dd_ratio']:>7.4f}")
+                  f"ret/dd={entry['return_dd_ratio']:>7.4f}  pnl/hr=${entry['pnl_per_hour']:>7.4f}")
 
     return pd.DataFrame(best_rows)
 

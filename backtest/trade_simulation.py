@@ -15,8 +15,8 @@ from evaluation_csv import EvaluationResults
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-31_MINI_BTCUSDT_1h_2024-01-01_2026-01-14_LB512_PRED12_P2",
-    "PRED_HORIZON": 12,
+    "EXPERIMENT_NAME": "2026-03-31_MINI_BTCUSDT_1h_2024-01-01_2026-01-14_LB512_PRED12_P2_LONG_TEST_PER",
+    "PRED_HORIZON": 8,
     "MIN_CHANGE_PCT": 1.2,
     "MAX_STD_PCT": 2.0,
 
@@ -26,8 +26,8 @@ Config = {
     "INITIAL_BALANCE": 1000.0,
     "FEE_PCT": 0.1,  # round-trip fee in %
 
-    "SL_PCT_RANGE": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.5, 3.0],
-    "TP_PCT_RANGE": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.5, 3.0],
+    "SL_PCT_RANGE": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.2, 3.4, 3.6, 3.8, 4.0],
+    "TP_PCT_RANGE": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.2, 3.4, 3.6, 3.8, 4.0],
 }
 
 
@@ -354,6 +354,7 @@ def compute_metrics(trades_df, balance=None):
             "return_dd_ratio": 0.0, "profit_factor": 0.0,
             "max_drawdown": 0.0, "sl_rate": 0.0, "tp_rate": 0.0, "horizon_rate": 0.0,
             "avg_duration_min": 0.0,
+            "pnl_per_hour": 0.0,
         }
 
     pnl_pcts = trades_df["pnl_pct"].values
@@ -389,6 +390,9 @@ def compute_metrics(trades_df, balance=None):
     horizon_rate = reasons.get("HORIZON", 0) / num_trades
     avg_duration = trades_df["duration_minutes"].mean()
 
+    exposure_hours = trades_df["duration_minutes"].sum() / 60.0
+    pnl_per_hour = round(total_pnl / exposure_hours, 4) if exposure_hours > 0 else 0.0
+
     return {
         "num_trades": num_trades,
         "win_rate": round(win_rate, 4),
@@ -402,6 +406,7 @@ def compute_metrics(trades_df, balance=None):
         "tp_rate": round(tp_rate, 4),
         "horizon_rate": round(horizon_rate, 4),
         "avg_duration_min": round(avg_duration, 1),
+        "pnl_per_hour": pnl_per_hour,
     }
 
 

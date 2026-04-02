@@ -22,24 +22,34 @@ Config = {
     # NOTE: it is intentionally fed with 512 historical points, the evaluation results show better performance
     # Evaluation used: 2026-03-13_MINI_BTCUSDT_1h_2021-01-01_2025-12-01_LB512_PRED12
 
-    "TOKENIZER": "NeoQuasar/Kronos-Tokenizer-2k",
-    "MODEL": "NeoQuasar/Kronos-mini",
-    "MODEL_PATH": "../Kronos_model",
+    # TRADING
     "PREDICTION_SYMBOL": "BTCUSDT",
     "TRADE_SYMBOL": "BTCUSDC",
     "TIMEFRAME": "1h",
-    "HIST_POINTS": 512,
-    "MAX_CONTEXT": 2048, # 512 for SMALL and BASE, 2048 for MINI
-    "RETRY_INTERVAL": 10,  # seconds between retries for new candle
-    "PRED_HORIZON": 7, # hours ahead to predict (set to 1 for next hour)
-    "N_PREDICTIONS": 100,
-    "MIN_PRICE_CHANGE_PCT": 0.7, # minimum predicted price change percentage to consider for trading
-    "MAX_PRICE_STD_PCT": 1.05, # maximum predicted price change std percentage to consider for trading
     "LEVERAGE": 1,
     "STOP_LOSS_PCT": 0,
+
+    # MODEL
+    "TOKENIZER": "NeoQuasar/Kronos-Tokenizer-2k",
+    "MODEL": "NeoQuasar/Kronos-mini",
+    "MODEL_PATH": "../Kronos_model",
+
+    # MODEL CONFIG
+    "HIST_POINTS": 512,
+    "MAX_CONTEXT": 1024, # use double the amount of hist points 
+    "PRED_HORIZON": 8, # hours ahead to predict (set to 1 for next hour)
+    "N_PREDICTIONS": 100, # use the same as in evaluation for consistency
+    "TOP_P": 1.0,
+
+    # OPTIMIZED PARAMETERS (from evaluation results)
+    "MIN_PRICE_CHANGE_PCT": 0.7, # minimum predicted price change percentage to consider for trading
+    "MAX_PRICE_STD_PCT": 1.05, # maximum predicted price change std percentage to consider for trading
+
+    # MISC
+    "RETRY_INTERVAL": 10,  # seconds between retries for new candle
     "STATE_FILE": "trading_bot/trade_state.json",
     "TRADE_LOG": "trading_bot/trade_log.csv",
-    "INITIAL_BALANCE": 1000.0,
+    "INITIAL_BALANCE": 1000.0, # Ignored in live trading where actual balance is used.
 }
 
 
@@ -77,7 +87,7 @@ def make_prediction(df, predictor):
         begin_time = time.time()
         close_preds_main, volume_preds_main = predictor.predict(
             df=x_df, x_timestamp=x_timestamp, y_timestamp=y_timestamp,
-            pred_len=Config["PRED_HORIZON"], T=1.0, top_p=0.95,
+            pred_len=Config["PRED_HORIZON"], T=1.0, top_p=Config["TOP_P"],
             sample_count=Config["N_PREDICTIONS"], verbose=True
         )
         print(f"Main prediction completed in {time.time() - begin_time:.2f} seconds.")

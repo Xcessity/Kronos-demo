@@ -17,7 +17,7 @@ from model import KronosTokenizer, Kronos, KronosPredictor
 
 LocalTokenizerName = "2026-03-31_MINI_BTCUSDT_1h_2021-01-01_2026-03-31_LB512_PRED12_P1" # for tokenizer path (can be different from model if you want)
 LocalModelName = "2026-03-31_MINI_BTCUSDT_1h_2024-01-01_2026-01-14_LB512_PRED12_P2"
-ExperimentSuffix = "" # optional suffix for results directory (e.g. to differentiate multiple runs with the same model)
+ExperimentSuffix = "_LONG_TEST_PER" # optional suffix for results directory (e.g. to differentiate multiple runs with the same model)
 
 # --- Configuration ---
 Config = {
@@ -36,7 +36,7 @@ Config = {
     "PRED_HORIZON": 12, # hours ahead to predict (set to 1 for next hour)
     "N_PREDICTIONS": 100,
     "TOP_P": 1.0,
-    "CANDLE_CSV": "D:/Projects/Cryptobot/Kronos/data/BTCUSDT_1h_20260114_to_20260401.csv",
+    "CANDLE_CSV": "D:/Projects/Cryptobot/Kronos/data/BTCUSDT_1h_20251216_to_20260401.csv",
     "RESULTS_DIR": "backtest/results/" + LocalModelName + ExperimentSuffix,
     "RESULTS_CSV": "evaluation_results.csv",
 }

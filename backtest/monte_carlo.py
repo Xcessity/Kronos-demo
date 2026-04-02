@@ -23,10 +23,10 @@ from trade_simulation import (
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-31_MINI_BTCUSDT_1h_2024-01-01_2026-01-14_LB512_PRED12_P2",
-    "PRED_HORIZON": 8, # horizon counter, not actual time units (depends on data frequency)!!!
-    "MIN_CHANGE_PCT": 1.2,
-    "MAX_STD_PCT": 2.0,
+    "EXPERIMENT_NAME": "2026-03-31_MINI_BTCUSDT_1h_2024-01-01_2026-01-14_LB512_PRED12_P2_LONG_TEST_PER",
+    "PRED_HORIZON": 5, # horizon counter, not actual time units (depends on data frequency)!!!
+    "MIN_CHANGE_PCT": 1.3,
+    "MAX_STD_PCT": 1.8,
 
     "REPO_PATH": Path(__file__).resolve().parent.parent,
     "EXPERIMENTS_DIR": "backtest/results",
@@ -380,7 +380,7 @@ def summarize_pass2(pass2_results, baseline_equity, baseline_metrics, run_dir):
 # Pass 3: Bootstrap Confidence Intervals
 # ═══════════════════════════════════════════════════════════════════
 
-BOOTSTRAP_METRICS = ["total_pnl", "sharpe_ratio", "profit_factor", "win_rate", "max_drawdown", "return_dd_ratio"]
+BOOTSTRAP_METRICS = ["total_pnl", "sharpe_ratio", "profit_factor", "win_rate", "max_drawdown", "return_dd_ratio", "pnl_per_hour"]
 
 
 def run_pass3_bootstrap(trades_df, rng):
@@ -435,6 +435,7 @@ def plot_forest_ci(ci_dict, baseline_metrics, run_dir):
         "win_rate": 0.5,
         "max_drawdown": None,  # negative is worse, no simple threshold
         "return_dd_ratio": 0,
+        "pnl_per_hour": 0,
     }
 
     metrics = BOOTSTRAP_METRICS
@@ -875,7 +876,8 @@ def plot_dashboard(pass1_results, pass2_results, pass3_results, pass3_ci,
     # Baseline stats
     bm = baseline_metrics
     ax_score.text(0.1, 0.05, f"Baseline: {bm['num_trades']} trades | PnL=${bm['total_pnl']:.2f} | "
-                  f"Sharpe={bm['sharpe_ratio']:.2f} | PF={bm['profit_factor']:.2f}",
+                  f"Sharpe={bm['sharpe_ratio']:.2f} | PF={bm['profit_factor']:.2f} | "
+                  f"PnL/hr=${bm['pnl_per_hour']:.4f}",
                   fontsize=7, transform=ax_score.transAxes, va="center", color="gray")
 
     # --- Pass 2: DD Histogram (bottom-left) ---
@@ -892,7 +894,8 @@ def plot_dashboard(pass1_results, pass2_results, pass3_results, pass3_ci,
     # --- Pass 3: Forest Plot (bottom-center) ---
     ax_ci = fig.add_subplot(gs[1, 1])
     thresholds = {"total_pnl": 0, "sharpe_ratio": 0, "profit_factor": 1.0,
-                  "win_rate": 0.5, "max_drawdown": None, "return_dd_ratio": 0}
+                  "win_rate": 0.5, "max_drawdown": None, "return_dd_ratio": 0,
+                  "pnl_per_hour": 0}
     for i, metric in enumerate(BOOTSTRAP_METRICS):
         ci = pass3_ci[metric]
         bval = baseline_metrics[metric]
@@ -1001,13 +1004,14 @@ def save_summary(baseline_metrics, pass1_results, pass2_results, pass3_ci,
     sl_str = f"{Config['SL_PCT']}%" if Config["SL_PCT"] is not None else "disabled"
     tp_str = f"{Config['TP_PCT']}%" if Config["TP_PCT"] is not None else "disabled"
     lines.append(f"SL/TP      : {sl_str} / {tp_str}")
-    lines.append(f"Params     : MIN_CHANGE={Config['MIN_CHANGE_PCT']}%, MAX_STD={Config['MAX_STD_PCT']}%")
+    lines.append(f"Params     : PRED_HORIZON={Config['PRED_HORIZON']}, MIN_CHANGE={Config['MIN_CHANGE_PCT']}%, MAX_STD={Config['MAX_STD_PCT']}%")
     lines.append("")
 
     bm = baseline_metrics
     lines.append(f"BASELINE: {bm['num_trades']} trades | PnL=${bm['total_pnl']:.2f} | "
                  f"Win={bm['win_rate']:.1%} | Sharpe={bm['sharpe_ratio']:.4f} | "
-                 f"PF={bm['profit_factor']:.4f} | MaxDD=${bm['max_drawdown']:.2f}")
+                 f"PF={bm['profit_factor']:.4f} | MaxDD=${bm['max_drawdown']:.2f} | "
+                 f"PnL/hr=${bm['pnl_per_hour']:.4f}")
     lines.append("")
 
     # Pass 1
@@ -1128,7 +1132,8 @@ if __name__ == "__main__":
           f"PnL=${baseline_metrics['total_pnl']:.2f}, "
           f"Win={baseline_metrics['win_rate']:.1%}, "
           f"Sharpe={baseline_metrics['sharpe_ratio']:.4f}, "
-          f"PF={baseline_metrics['profit_factor']:.4f}")
+          f"PF={baseline_metrics['profit_factor']:.4f}, "
+          f"PnL/hr=${baseline_metrics['pnl_per_hour']:.4f}")
 
     # 5. Pass 1: Trade Skipping
     print("\n" + "=" * 60)
