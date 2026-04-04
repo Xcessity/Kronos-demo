@@ -15,9 +15,9 @@ from binance.client import Client
 
 from model import KronosTokenizer, Kronos, KronosPredictor
 
-LocalTokenizerName = "2026-03-31_MINI_BTCUSDT_1h_2021-01-01_2026-03-31_LB512_PRED12_P1" # for tokenizer path (can be different from model if you want)
-LocalModelName = "2026-03-31_MINI_BTCUSDT_1h_2024-01-01_2026-01-14_LB512_PRED12_P2"
-ExperimentSuffix = "_LONG_TEST_PER" # optional suffix for results directory (e.g. to differentiate multiple runs with the same model)
+LocalTokenizerName = "2026-04-04_MINI_BTCUSDT_1h_2021-01-01_2023-12-31_LB512_PRED5_P1" # for tokenizer path (can be different from model if you want)
+LocalModelName = "2026-04-04_MINI_BTCUSDT_1h_2024-01-01_2026-01-14_LB512_PRED5_P2"
+ExperimentSuffix = "" # optional suffix for results directory (e.g. to differentiate multiple runs with the same model)
 
 # --- Configuration ---
 Config = {
@@ -33,10 +33,10 @@ Config = {
 
     "HIST_POINTS": 512, # number of historical candles to provide as context (must be <= MAX_CONTEXT)
     "MAX_CONTEXT": 1024, # double the HIST_POINTS to allow room for predictions in the context window (must be <= model's max context length)
-    "PRED_HORIZON": 12, # hours ahead to predict (set to 1 for next hour)
+    "PRED_HORIZON": 5, # hours ahead to predict (set to 1 for next hour)
     "N_PREDICTIONS": 100,
     "TOP_P": 1.0,
-    "CANDLE_CSV": "D:/Projects/Cryptobot/Kronos/data/BTCUSDT_1h_20251216_to_20260401.csv",
+    "CANDLE_CSV": "D:/Projects/Cryptobot/Kronos/data/BTCUSDT_1h_20260114_to_20260401.csv",
     "RESULTS_DIR": "backtest/results/" + LocalModelName + ExperimentSuffix,
     "RESULTS_CSV": "evaluation_results.csv",
 }

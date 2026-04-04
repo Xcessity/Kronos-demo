@@ -23,10 +23,10 @@ from trade_simulation import (
 
 # --- Configuration ---
 Config = {
-    "EXPERIMENT_NAME": "2026-03-31_MINI_BTCUSDT_1h_2024-01-01_2026-01-14_LB512_PRED12_P2_LONG_TEST_PER",
+    "EXPERIMENT_NAME": "2026-04-04_MINI_BTCUSDT_1h_2024-01-01_2026-01-14_LB512_PRED5_P2",
     "PRED_HORIZON": 5, # horizon counter, not actual time units (depends on data frequency)!!!
-    "MIN_CHANGE_PCT": 1.3,
-    "MAX_STD_PCT": 1.8,
+    "MIN_CHANGE_PCT": 1.2,
+    "MAX_STD_PCT": 1.65,
 
     "REPO_PATH": Path(__file__).resolve().parent.parent,
     "EXPERIMENTS_DIR": "backtest/results",
@@ -498,8 +498,11 @@ def plot_forest_ci(ci_dict, baseline_metrics, run_dir):
 
 
 def plot_bootstrap_distributions(pass3_results, baseline_metrics, run_dir):
-    """Small-multiples histogram grid (2x3) for each metric."""
-    fig, axes = plt.subplots(2, 3, figsize=(14, 8))
+    """Small-multiples histogram grid for each metric."""
+    n = len(BOOTSTRAP_METRICS)
+    ncols = 3
+    nrows = (n + ncols - 1) // ncols
+    fig, axes = plt.subplots(nrows, ncols, figsize=(14, 4 * nrows))
     axes = axes.flatten()
 
     for i, metric in enumerate(BOOTSTRAP_METRICS):
@@ -514,6 +517,9 @@ def plot_bootstrap_distributions(pass3_results, baseline_metrics, run_dir):
         ax.grid(True, alpha=0.3)
         if i == 0:
             ax.legend(fontsize=7)
+
+    for j in range(n, len(axes)):
+        axes[j].set_visible(False)
 
     fig.suptitle("Pass 3: Bootstrap Distributions", fontsize=13, fontweight="bold")
     fig.tight_layout()
